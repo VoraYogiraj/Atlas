@@ -11,7 +11,6 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from atlas.core.aid import AtlasID
 from atlas.core.resource import AtlasResource
 from atlas.relationships.relationship import AtlasRelationship
 
@@ -74,8 +73,8 @@ class AtlasResourceGraph:
         return [
             relationship
             for relationship in self._relationships
-            if relationship.involves(first.aid)
-            and relationship.involves(second.aid)
+            if relationship.involves(first)
+            and relationship.involves(second)
         ]
 
     def for_resource(
@@ -88,7 +87,7 @@ class AtlasResourceGraph:
         return [
             relationship
             for relationship in self._relationships
-            if relationship.involves(resource.aid)
+            if relationship.involves(resource)
         ]
 
     # ------------------------------------------------------------------
