@@ -1,5 +1,19 @@
+from atlas.classification.classification import AtlasClassification
+from atlas.core.resource import AtlasResource
 from atlas.project import AtlasProject
 from atlas.resource_registry import AtlasResourceRegistry
+
+
+def create_resource(name: str) -> AtlasResource:
+    classification = AtlasClassification(
+        id="wall",
+        name="Wall",
+    )
+
+    return AtlasResource(
+        classification=classification,
+        name=name,
+    )
 
 
 def test_project_has_id():
@@ -75,6 +89,96 @@ def test_projects_have_independent_registries():
     second = AtlasProject(name="Project B")
 
     assert first.resources is not second.resources
+
+
+# ----------------------------------------------------------------------
+# Project → Registry → Resource integration
+# ----------------------------------------------------------------------
+
+
+def test_project_can_register_resource():
+    project = AtlasProject(name="Residential Project")
+    resource = create_resource("North Wall")
+
+    project.resources.register(resource)
+
+    assert project.resources.count == 1
+    assert project.resources.contains(resource.aid)
+
+
+def test_project_can_retrieve_registered_resource():
+    project = AtlasProject(name="Residential Project")
+    resource = create_resource("North Wall")
+
+    project.resources.register(resource)
+
+    result = project.resources.get(resource.aid)
+
+    assert result is resource
+
+
+def test_project_can_require_registered_resource():
+    project = AtlasProject(name="Residential Project")
+    resource = create_resource("North Wall")
+
+    project.resources.register(resource)
+
+    result = project.resources.require(resource.aid)
+
+    assert result is resource
+
+
+def test_project_can_unregister_resource():
+    project = AtlasProject(name="Residential Project")
+    resource = create_resource("North Wall")
+
+    project.resources.register(resource)
+
+    removed = project.resources.unregister(resource.aid)
+
+    assert removed is resource
+    assert project.resources.count == 0
+    assert not project.resources.contains(resource.aid)
+
+
+def test_resources_are_isolated_between_projects():
+    first = AtlasProject(name="Project A")
+    second = AtlasProject(name="Project B")
+
+    resource = create_resource("North Wall")
+
+    first.resources.register(resource)
+
+    assert first.resources.contains(resource.aid)
+    assert not second.resources.contains(resource.aid)
+
+
+def test_project_resource_count():
+    project = AtlasProject(name="Residential Project")
+
+    wall = create_resource("North Wall")
+    south_wall = create_resource("South Wall")
+    east_wall = create_resource("East Wall")
+
+    project.resources.register(wall)
+    project.resources.register(south_wall)
+    project.resources.register(east_wall)
+
+    assert project.resources.count == 3
+
+
+def test_project_can_iterate_resources():
+    project = AtlasProject(name="Residential Project")
+
+    wall = create_resource("North Wall")
+    south_wall = create_resource("South Wall")
+
+    project.resources.register(wall)
+    project.resources.register(south_wall)
+
+    resources = list(project.resources)
+
+    assert resources == [wall, south_wall]
 
 
 def test_project_repr():
