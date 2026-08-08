@@ -8,6 +8,7 @@ Specifications:
     ENG-003 — Resource Classification
     ENG-004 — Resource Properties
     ENG-005 — Resource Relationships
+    ENG-007 — Resource Lifecycle
 """
 
 from __future__ import annotations
@@ -16,6 +17,7 @@ from typing import TYPE_CHECKING
 
 from atlas.classification.classification import AtlasClassification
 from atlas.core.aid import AtlasID
+from atlas.lifecycle.lifecycle import AtlasLifecycle
 
 if TYPE_CHECKING:
     from atlas.properties.property import AtlasProperty
@@ -27,17 +29,6 @@ class AtlasResource:
     Base class for every Atlas Resource.
 
     Every engineering entity in Atlas inherits from this class.
-
-    A Resource has:
-        - Atlas identity
-        - Classification
-        - Properties
-        - Relationships
-        - Lifecycle state
-        - Metadata
-
-    Specialized concerns such as geometry, rendering, persistence,
-    and AI behavior do not belong in this base class.
     """
 
     def __init__(
@@ -56,9 +47,7 @@ class AtlasResource:
 
         self._metadata: dict[str, object] = {}
 
-        # Temporary primitive representation.
-        # This will be replaced by AtlasLifecycle.
-        self._lifecycle = "created"
+        self._lifecycle = AtlasLifecycle.CREATED
 
     # ------------------------------------------------------------------
     # Identity
@@ -102,25 +91,15 @@ class AtlasResource:
         return self._properties
 
     def set_property(self, property: AtlasProperty) -> None:
-        """
-        Add or replace a Resource property.
-
-        Properties are indexed by their Atlas property ID.
-        """
+        """Add or replace a Resource property."""
         self._properties[property.id] = property
 
     def get_property(self, property_id: str) -> AtlasProperty | None:
-        """
-        Retrieve a property by its ID.
-        """
+        """Retrieve a property by its ID."""
         return self._properties.get(property_id)
 
     def remove_property(self, property_id: str) -> AtlasProperty | None:
-        """
-        Remove and return a property by its ID.
-
-        Returns None when the property does not exist.
-        """
+        """Remove and return a property by its ID."""
         return self._properties.pop(property_id, None)
 
     # ------------------------------------------------------------------
@@ -154,14 +133,38 @@ class AtlasResource:
     # ------------------------------------------------------------------
 
     @property
-    def lifecycle(self) -> str:
-        """
-        Return the current lifecycle state.
-
-        This is temporarily represented as a string.
-        AtlasLifecycle will replace this in the next step.
-        """
+    def lifecycle(self) -> AtlasLifecycle:
+        """Return the current lifecycle state."""
         return self._lifecycle
+
+    def transition_to(self, target: AtlasLifecycle) -> None:
+        """
+        Transition the Resource to another lifecycle state.
+
+        Raises
+        ------
+        ValueError
+            If the requested lifecycle transition is not allowed.
+        """
+        if not self._lifecycle.can_transition_to(target):
+            raise ValueError(
+                f"Invalid lifecycle transition: "
+                f"{self._lifecycle.value} -> {target.value}"
+            )
+
+        self._lifecycle = target
+
+    def activate(self) -> None:
+        """Activate the Resource."""
+        self.transition_to(AtlasLifecycle.ACTIVE)
+
+    def archive(self) -> None:
+        """Archive the Resource."""
+        self.transition_to(AtlasLifecycle.ARCHIVED)
+
+    def delete(self) -> None:
+        """Mark the Resource as deleted."""
+        self.transition_to(AtlasLifecycle.DELETED)
 
     # ------------------------------------------------------------------
     # Representation
@@ -171,5 +174,6 @@ class AtlasResource:
         return (
             f"{self.__class__.__name__}("
             f"aid={self.aid}, "
-            f"classification='{self.classification.name}')"
+            f"classification='{self.classification.name}', "
+            f"lifecycle='{self.lifecycle.value}')"
         )
