@@ -77,20 +77,8 @@ class AtlasResourceGraph:
         """
         Ensure both endpoints of a Relationship belong to this graph.
         """
-        source = self._resources.get(relationship.source)
-        target = self._resources.get(relationship.target)
-
-        if source is None:
-            raise ValueError(
-                f"Relationship source Resource is not registered: "
-                f"{relationship.source}"
-            )
-
-        if target is None:
-            raise ValueError(
-                f"Relationship target Resource is not registered: "
-                f"{relationship.target}"
-            )
+        self._validate_resource(relationship.source)
+        self._validate_resource(relationship.target)
 
     # ------------------------------------------------------------------
     # Relationship Registration
@@ -129,7 +117,9 @@ class AtlasResourceGraph:
         self,
         relationship: AtlasRelationship,
     ) -> bool:
-        """Return True if the Relationship exists in the graph."""
+        """
+        Return True if the Relationship exists in the graph.
+        """
         return relationship in self._relationships
 
     def get_between(
@@ -139,6 +129,8 @@ class AtlasResourceGraph:
     ) -> list[AtlasRelationship]:
         """
         Return Relationships connecting two Resources.
+
+        Relationship direction is ignored for this lookup.
 
         Both Resources must belong to this graph.
         """
@@ -152,12 +144,14 @@ class AtlasResourceGraph:
             relationship
             for relationship in self._relationships
             if (
-                relationship.source == first_id
-                and relationship.target == second_id
-            )
-            or (
-                relationship.source == second_id
-                and relationship.target == first_id
+                (
+                    relationship.source.aid == first_id
+                    and relationship.target.aid == second_id
+                )
+                or (
+                    relationship.source.aid == second_id
+                    and relationship.target.aid == first_id
+                )
             )
         ]
 
@@ -178,8 +172,8 @@ class AtlasResourceGraph:
             relationship
             for relationship in self._relationships
             if (
-                relationship.source == resource_id
-                or relationship.target == resource_id
+                relationship.source.aid == resource_id
+                or relationship.target.aid == resource_id
             )
         ]
 
@@ -194,6 +188,8 @@ class AtlasResourceGraph:
         """
         Return Resources directly connected to a Resource.
 
+        Relationship direction is ignored.
+
         The returned Resources are resolved through the graph's
         Resource Registry.
 
@@ -205,18 +201,18 @@ class AtlasResourceGraph:
         self._validate_resource(resource)
 
         resource_id = resource.aid
-        neighbor_ids: list = []
+        neighbor_ids = []
 
         for relationship in self._relationships:
-            if relationship.source == resource_id:
-                neighbor_ids.append(relationship.target)
+            if relationship.source.aid == resource_id:
+                neighbor_ids.append(relationship.target.aid)
 
-            elif relationship.target == resource_id:
-                neighbor_ids.append(relationship.source)
+            elif relationship.target.aid == resource_id:
+                neighbor_ids.append(relationship.source.aid)
 
         return [
-            self._resources.require(resource_id)
-            for resource_id in neighbor_ids
+            self._resources.require(neighbor_id)
+            for neighbor_id in neighbor_ids
         ]
 
     def relationships_of_type(
@@ -226,6 +222,8 @@ class AtlasResourceGraph:
     ) -> list[AtlasRelationship]:
         """
         Return relationships of a specific type involving a Resource.
+
+        Relationship direction is ignored.
 
         Raises
         ------
@@ -240,10 +238,12 @@ class AtlasResourceGraph:
             relationship
             for relationship in self._relationships
             if (
-                relationship.source == resource_id
-                or relationship.target == resource_id
+                (
+                    relationship.source.aid == resource_id
+                    or relationship.target.aid == resource_id
+                )
+                and relationship.relationship_type == relationship_type
             )
-            and relationship.relationship_type == relationship_type
         ]
 
     def connected(
@@ -258,7 +258,12 @@ class AtlasResourceGraph:
 
         It does not perform multi-hop graph traversal.
         """
-        return bool(self.get_between(first, second))
+        return bool(
+            self.get_between(
+                first,
+                second,
+            )
+        )
 
     # ------------------------------------------------------------------
     # Removal
@@ -286,17 +291,25 @@ class AtlasResourceGraph:
 
     @property
     def count(self) -> int:
-        """Return the number of Relationships in the graph."""
+        """
+        Return the number of Relationships in the graph.
+        """
         return len(self._relationships)
 
     def __len__(self) -> int:
-        """Return the number of Relationships in the graph."""
+        """
+        Return the number of Relationships in the graph.
+        """
         return len(self._relationships)
 
     def __iter__(self) -> Iterator[AtlasRelationship]:
-        """Iterate over Relationships."""
+        """
+        Iterate over Relationships.
+        """
         return iter(self._relationships)
 
     def clear(self) -> None:
-        """Remove all Relationships from the graph."""
+        """
+        Remove all Relationships from the graph.
+        """
         self._relationships.clear()

@@ -12,7 +12,9 @@ def make_resource(
         name=name,
         classification="building",
     )
+
     registry.register(resource)
+
     return resource
 
 
@@ -20,11 +22,16 @@ def make_relationship(
     source: AtlasResource,
     target: AtlasResource,
     relationship_type: str = "contains",
+    relationship_id: str | None = None,
 ) -> AtlasRelationship:
+    if relationship_id is None:
+        relationship_id = f"{source.aid}-{target.aid}-{relationship_type}"
+
     return AtlasRelationship(
-        source=source.aid,
-        target=target.aid,
+        id=relationship_id,
         relationship_type=relationship_type,
+        source=source,
+        target=target,
     )
 
 
@@ -100,9 +107,13 @@ def test_relationship_source_must_be_registered() -> None:
         name="Unregistered",
         classification="building",
     )
+
     target = make_resource(registry, "Floor")
 
-    relationship = make_relationship(source, target)
+    relationship = make_relationship(
+        source,
+        target,
+    )
 
     graph = AtlasResourceGraph(registry)
 
@@ -120,12 +131,16 @@ def test_relationship_target_must_be_registered() -> None:
     registry = AtlasResourceRegistry()
 
     source = make_resource(registry, "Building")
+
     target = AtlasResource(
         name="Unregistered",
         classification="floor",
     )
 
-    relationship = make_relationship(source, target)
+    relationship = make_relationship(
+        source,
+        target,
+    )
 
     graph = AtlasResourceGraph(registry)
 
@@ -150,14 +165,18 @@ def test_get_between_returns_relationship() -> None:
     building = make_resource(registry, "Building")
     floor = make_resource(registry, "Floor")
 
-    relationship = make_relationship(building, floor)
+    relationship = make_relationship(
+        building,
+        floor,
+    )
 
     graph = AtlasResourceGraph(registry)
     graph.add_relationship(relationship)
 
-    result = graph.get_between(building, floor)
-
-    assert result == [relationship]
+    assert graph.get_between(
+        building,
+        floor,
+    ) == [relationship]
 
 
 def test_get_between_is_direction_independent() -> None:
@@ -166,12 +185,18 @@ def test_get_between_is_direction_independent() -> None:
     building = make_resource(registry, "Building")
     floor = make_resource(registry, "Floor")
 
-    relationship = make_relationship(building, floor)
+    relationship = make_relationship(
+        building,
+        floor,
+    )
 
     graph = AtlasResourceGraph(registry)
     graph.add_relationship(relationship)
 
-    assert graph.get_between(floor, building) == [relationship]
+    assert graph.get_between(
+        floor,
+        building,
+    ) == [relationship]
 
 
 def test_get_between_returns_empty_when_not_connected() -> None:
@@ -181,12 +206,19 @@ def test_get_between_returns_empty_when_not_connected() -> None:
     floor = make_resource(registry, "Floor")
     room = make_resource(registry, "Room")
 
-    relationship = make_relationship(building, floor)
-
     graph = AtlasResourceGraph(registry)
-    graph.add_relationship(relationship)
 
-    assert graph.get_between(building, room) == []
+    graph.add_relationship(
+        make_relationship(
+            building,
+            floor,
+        )
+    )
+
+    assert graph.get_between(
+        building,
+        room,
+    ) == []
 
 
 def test_for_resource_returns_all_relationships() -> None:
@@ -200,12 +232,14 @@ def test_for_resource_returns_all_relationships() -> None:
         building,
         floor,
         "contains",
+        "relationship-1",
     )
 
     relationship_two = make_relationship(
         room,
         building,
         "belongs_to",
+        "relationship-2",
     )
 
     graph = AtlasResourceGraph(registry)
@@ -222,7 +256,10 @@ def test_for_resource_returns_all_relationships() -> None:
 def test_for_resource_returns_empty_when_no_relationships() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
+    building = make_resource(
+        registry,
+        "Building",
+    )
 
     graph = AtlasResourceGraph(registry)
 
@@ -244,11 +281,21 @@ def test_neighbors_returns_directly_connected_resources() -> None:
     graph = AtlasResourceGraph(registry)
 
     graph.add_relationship(
-        make_relationship(building, floor)
+        make_relationship(
+            building,
+            floor,
+            "contains",
+            "relationship-1",
+        )
     )
 
     graph.add_relationship(
-        make_relationship(building, room)
+        make_relationship(
+            building,
+            room,
+            "contains",
+            "relationship-2",
+        )
     )
 
     assert graph.neighbors(building) == [
@@ -279,7 +326,10 @@ def test_neighbors_works_for_incoming_relationships() -> None:
 def test_neighbors_returns_empty_for_isolated_resource() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
+    building = make_resource(
+        registry,
+        "Building",
+    )
 
     graph = AtlasResourceGraph(registry)
 
@@ -289,13 +339,23 @@ def test_neighbors_returns_empty_for_isolated_resource() -> None:
 def test_neighbors_returns_registered_resource_objects() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    floor = make_resource(registry, "Floor")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
 
     graph = AtlasResourceGraph(registry)
 
     graph.add_relationship(
-        make_relationship(building, floor)
+        make_relationship(
+            building,
+            floor,
+        )
     )
 
     neighbors = graph.neighbors(building)
@@ -306,7 +366,7 @@ def test_neighbors_returns_registered_resource_objects() -> None:
 def test_neighbors_rejects_unregistered_resource() -> None:
     registry = AtlasResourceRegistry()
 
-    building = AtlasResource(
+    resource = AtlasResource(
         name="Unregistered",
         classification="building",
     )
@@ -314,7 +374,7 @@ def test_neighbors_rejects_unregistered_resource() -> None:
     graph = AtlasResourceGraph(registry)
 
     try:
-        graph.neighbors(building)
+        graph.neighbors(resource)
     except ValueError:
         pass
     else:
@@ -339,18 +399,21 @@ def test_relationships_of_type_returns_matching_relationships() -> None:
         building,
         floor,
         "contains",
+        "relationship-1",
     )
 
     contains_room = make_relationship(
         building,
         room,
         "contains",
+        "relationship-2",
     )
 
     belongs_to = make_relationship(
         room,
         building,
         "belongs_to",
+        "relationship-3",
     )
 
     graph = AtlasResourceGraph(registry)
@@ -371,8 +434,15 @@ def test_relationships_of_type_returns_matching_relationships() -> None:
 def test_relationships_of_type_includes_incoming_relationships() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    room = make_resource(registry, "Room")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    room = make_resource(
+        registry,
+        "Room",
+    )
 
     relationship = make_relationship(
         room,
@@ -381,6 +451,7 @@ def test_relationships_of_type_includes_incoming_relationships() -> None:
     )
 
     graph = AtlasResourceGraph(registry)
+
     graph.add_relationship(relationship)
 
     assert graph.relationships_of_type(
@@ -392,19 +463,28 @@ def test_relationships_of_type_includes_incoming_relationships() -> None:
 def test_relationships_of_type_excludes_other_types() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    floor = make_resource(registry, "Floor")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
 
     contains = make_relationship(
         building,
         floor,
         "contains",
+        "relationship-1",
     )
 
     belongs_to = make_relationship(
         floor,
         building,
         "belongs_to",
+        "relationship-2",
     )
 
     graph = AtlasResourceGraph(registry)
@@ -421,8 +501,15 @@ def test_relationships_of_type_excludes_other_types() -> None:
 def test_relationships_of_type_returns_empty_for_unknown_type() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    floor = make_resource(registry, "Floor")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
 
     graph = AtlasResourceGraph(registry)
 
@@ -430,7 +517,6 @@ def test_relationships_of_type_returns_empty_for_unknown_type() -> None:
         make_relationship(
             building,
             floor,
-            "contains",
         )
     )
 
@@ -443,7 +529,7 @@ def test_relationships_of_type_returns_empty_for_unknown_type() -> None:
 def test_relationships_of_type_rejects_unregistered_resource() -> None:
     registry = AtlasResourceRegistry()
 
-    building = AtlasResource(
+    resource = AtlasResource(
         name="Unregistered",
         classification="building",
     )
@@ -452,7 +538,7 @@ def test_relationships_of_type_rejects_unregistered_resource() -> None:
 
     try:
         graph.relationships_of_type(
-            building,
+            resource,
             "contains",
         )
     except ValueError:
@@ -471,55 +557,121 @@ def test_relationships_of_type_rejects_unregistered_resource() -> None:
 def test_connected_returns_true_for_direct_relationship() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    floor = make_resource(registry, "Floor")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
 
     graph = AtlasResourceGraph(registry)
 
     graph.add_relationship(
-        make_relationship(building, floor)
+        make_relationship(
+            building,
+            floor,
+        )
     )
 
-    assert graph.connected(building, floor) is True
-    assert graph.connected(floor, building) is True
+    assert graph.connected(
+        building,
+        floor,
+    ) is True
+
+    assert graph.connected(
+        floor,
+        building,
+    ) is True
 
 
 def test_connected_returns_false_for_unrelated_resources() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    floor = make_resource(registry, "Floor")
-    room = make_resource(registry, "Room")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
+
+    room = make_resource(
+        registry,
+        "Room",
+    )
 
     graph = AtlasResourceGraph(registry)
 
     graph.add_relationship(
-        make_relationship(building, floor)
+        make_relationship(
+            building,
+            floor,
+        )
     )
 
-    assert graph.connected(building, room) is False
+    assert graph.connected(
+        building,
+        room,
+    ) is False
 
 
 def test_connected_is_direct_only() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    floor = make_resource(registry, "Floor")
-    room = make_resource(registry, "Room")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
+
+    room = make_resource(
+        registry,
+        "Room",
+    )
 
     graph = AtlasResourceGraph(registry)
 
     graph.add_relationship(
-        make_relationship(building, floor)
+        make_relationship(
+            building,
+            floor,
+            "contains",
+            "relationship-1",
+        )
     )
 
     graph.add_relationship(
-        make_relationship(floor, room)
+        make_relationship(
+            floor,
+            room,
+            "contains",
+            "relationship-2",
+        )
     )
 
-    assert graph.connected(building, floor) is True
-    assert graph.connected(floor, room) is True
-    assert graph.connected(building, room) is False
+    assert graph.connected(
+        building,
+        floor,
+    ) is True
+
+    assert graph.connected(
+        floor,
+        room,
+    ) is True
+
+    assert graph.connected(
+        building,
+        room,
+    ) is False
 
 
 # ---------------------------------------------------------------------------
@@ -530,7 +682,10 @@ def test_connected_is_direct_only() -> None:
 def test_get_between_rejects_unregistered_first_resource() -> None:
     registry = AtlasResourceRegistry()
 
-    registered = make_resource(registry, "Registered")
+    registered = make_resource(
+        registry,
+        "Registered",
+    )
 
     unregistered = AtlasResource(
         name="Unregistered",
@@ -555,7 +710,10 @@ def test_get_between_rejects_unregistered_first_resource() -> None:
 def test_get_between_rejects_unregistered_second_resource() -> None:
     registry = AtlasResourceRegistry()
 
-    registered = make_resource(registry, "Registered")
+    registered = make_resource(
+        registry,
+        "Registered",
+    )
 
     unregistered = AtlasResource(
         name="Unregistered",
@@ -585,8 +743,15 @@ def test_get_between_rejects_unregistered_second_resource() -> None:
 def test_remove_relationship() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    floor = make_resource(registry, "Floor")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
 
     relationship = make_relationship(
         building,
@@ -608,8 +773,15 @@ def test_remove_relationship() -> None:
 def test_remove_missing_relationship_returns_none() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    floor = make_resource(registry, "Floor")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
 
     relationship = make_relationship(
         building,
@@ -624,8 +796,15 @@ def test_remove_missing_relationship_returns_none() -> None:
 def test_remove_relationship_updates_queries() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    floor = make_resource(registry, "Floor")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
 
     relationship = make_relationship(
         building,
@@ -636,14 +815,26 @@ def test_remove_relationship_updates_queries() -> None:
 
     graph.add_relationship(relationship)
 
-    assert graph.connected(building, floor) is True
+    assert graph.connected(
+        building,
+        floor,
+    ) is True
+
     assert graph.neighbors(building) == [floor]
 
     graph.remove_relationship(relationship)
 
-    assert graph.connected(building, floor) is False
+    assert graph.connected(
+        building,
+        floor,
+    ) is False
+
     assert graph.neighbors(building) == []
-    assert graph.get_between(building, floor) == []
+
+    assert graph.get_between(
+        building,
+        floor,
+    ) == []
 
 
 # ---------------------------------------------------------------------------
@@ -654,18 +845,39 @@ def test_remove_relationship_updates_queries() -> None:
 def test_clear_removes_all_relationships() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    floor = make_resource(registry, "Floor")
-    room = make_resource(registry, "Room")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
+
+    room = make_resource(
+        registry,
+        "Room",
+    )
 
     graph = AtlasResourceGraph(registry)
 
     graph.add_relationship(
-        make_relationship(building, floor)
+        make_relationship(
+            building,
+            floor,
+            "contains",
+            "relationship-1",
+        )
     )
 
     graph.add_relationship(
-        make_relationship(floor, room)
+        make_relationship(
+            floor,
+            room,
+            "contains",
+            "relationship-2",
+        )
     )
 
     assert graph.count == 2
@@ -680,19 +892,30 @@ def test_clear_removes_all_relationships() -> None:
 def test_clear_does_not_remove_resources_from_registry() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    floor = make_resource(registry, "Floor")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
 
     graph = AtlasResourceGraph(registry)
 
     graph.add_relationship(
-        make_relationship(building, floor)
+        make_relationship(
+            building,
+            floor,
+        )
     )
 
     graph.clear()
 
     assert registry.contains(building.aid)
     assert registry.contains(floor.aid)
+
     assert registry.get(building.aid) is building
     assert registry.get(floor.aid) is floor
 
@@ -705,20 +928,33 @@ def test_clear_does_not_remove_resources_from_registry() -> None:
 def test_graph_iteration_preserves_relationship_order() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    floor = make_resource(registry, "Floor")
-    room = make_resource(registry, "Room")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
+
+    room = make_resource(
+        registry,
+        "Room",
+    )
 
     first = make_relationship(
         building,
         floor,
         "contains",
+        "relationship-1",
     )
 
     second = make_relationship(
         floor,
         room,
         "contains",
+        "relationship-2",
     )
 
     graph = AtlasResourceGraph(registry)
@@ -740,19 +976,28 @@ def test_graph_iteration_preserves_relationship_order() -> None:
 def test_multiple_relationships_between_same_resources_are_supported() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    room = make_resource(registry, "Room")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    room = make_resource(
+        registry,
+        "Room",
+    )
 
     first = make_relationship(
         building,
         room,
         "contains",
+        "relationship-1",
     )
 
     second = make_relationship(
         building,
         room,
         "references",
+        "relationship-2",
     )
 
     graph = AtlasResourceGraph(registry)
@@ -761,6 +1006,7 @@ def test_multiple_relationships_between_same_resources_are_supported() -> None:
     graph.add_relationship(second)
 
     assert graph.count == 2
+
     assert graph.get_between(
         building,
         room,
@@ -773,8 +1019,15 @@ def test_multiple_relationships_between_same_resources_are_supported() -> None:
 def test_neighbors_returns_one_entry_per_relationship() -> None:
     registry = AtlasResourceRegistry()
 
-    building = make_resource(registry, "Building")
-    room = make_resource(registry, "Room")
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    room = make_resource(
+        registry,
+        "Room",
+    )
 
     graph = AtlasResourceGraph(registry)
 
@@ -783,6 +1036,7 @@ def test_neighbors_returns_one_entry_per_relationship() -> None:
             building,
             room,
             "contains",
+            "relationship-1",
         )
     )
 
@@ -791,6 +1045,7 @@ def test_neighbors_returns_one_entry_per_relationship() -> None:
             building,
             room,
             "references",
+            "relationship-2",
         )
     )
 
@@ -798,3 +1053,178 @@ def test_neighbors_returns_one_entry_per_relationship() -> None:
         room,
         room,
     ]
+
+
+# ---------------------------------------------------------------------------
+# Self references
+# ---------------------------------------------------------------------------
+
+
+def test_self_reference_is_supported() -> None:
+    registry = AtlasResourceRegistry()
+
+    resource = make_resource(
+        registry,
+        "Resource",
+    )
+
+    relationship = make_relationship(
+        resource,
+        resource,
+        "references",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(relationship)
+
+    assert graph.contains(relationship)
+    assert graph.count == 1
+
+
+def test_self_reference_appears_in_for_resource() -> None:
+    registry = AtlasResourceRegistry()
+
+    resource = make_resource(
+        registry,
+        "Resource",
+    )
+
+    relationship = make_relationship(
+        resource,
+        resource,
+        "references",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(relationship)
+
+    assert graph.for_resource(resource) == [
+        relationship,
+    ]
+
+
+def test_self_reference_connected() -> None:
+    registry = AtlasResourceRegistry()
+
+    resource = make_resource(
+        registry,
+        "Resource",
+    )
+
+    relationship = make_relationship(
+        resource,
+        resource,
+        "references",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(relationship)
+
+    assert graph.connected(
+        resource,
+        resource,
+    ) is True
+
+
+# ---------------------------------------------------------------------------
+# Query immutability
+# ---------------------------------------------------------------------------
+
+
+def test_neighbors_does_not_modify_graph() -> None:
+    registry = AtlasResourceRegistry()
+
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    relationship = make_relationship(
+        building,
+        floor,
+    )
+
+    graph.add_relationship(relationship)
+
+    before = list(graph)
+
+    graph.neighbors(building)
+
+    assert list(graph) == before
+    assert graph.count == 1
+
+
+def test_relationships_of_type_does_not_modify_graph() -> None:
+    registry = AtlasResourceRegistry()
+
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
+
+    relationship = make_relationship(
+        building,
+        floor,
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(relationship)
+
+    before = list(graph)
+
+    graph.relationships_of_type(
+        building,
+        "contains",
+    )
+
+    assert list(graph) == before
+    assert graph.count == 1
+
+
+def test_connected_does_not_modify_graph() -> None:
+    registry = AtlasResourceRegistry()
+
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
+
+    relationship = make_relationship(
+        building,
+        floor,
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(relationship)
+
+    before = list(graph)
+
+    graph.connected(
+        building,
+        floor,
+    )
+
+    assert list(graph) == before
+    assert graph.count == 1
