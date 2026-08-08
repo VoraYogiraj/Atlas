@@ -1,5 +1,6 @@
 from atlas.classification.classification import AtlasClassification
 from atlas.core.resource import AtlasResource
+from atlas.graph import AtlasResourceGraph
 from atlas.project import AtlasProject
 from atlas.resource_registry import AtlasResourceRegistry
 
@@ -14,6 +15,11 @@ def create_resource(name: str) -> AtlasResource:
         classification=classification,
         name=name,
     )
+
+
+# ----------------------------------------------------------------------
+# Project Identity
+# ----------------------------------------------------------------------
 
 
 def test_project_has_id():
@@ -58,6 +64,11 @@ def test_project_rejects_whitespace_name():
         )
 
 
+# ----------------------------------------------------------------------
+# Project Metadata
+# ----------------------------------------------------------------------
+
+
 def test_project_metadata():
     project = AtlasProject(name="Residential Project")
 
@@ -66,6 +77,11 @@ def test_project_metadata():
 
     assert project.metadata["location"] == "Surat"
     assert project.metadata["units"] == "mm"
+
+
+# ----------------------------------------------------------------------
+# Resource Registry
+# ----------------------------------------------------------------------
 
 
 def test_project_owns_resource_registry():
@@ -81,7 +97,6 @@ def test_project_registry_is_stable():
     registry = project.resources
 
     assert project.resources is registry
-    assert project.resources is registry
 
 
 def test_projects_have_independent_registries():
@@ -92,7 +107,7 @@ def test_projects_have_independent_registries():
 
 
 # ----------------------------------------------------------------------
-# Project → Registry → Resource integration
+# Project → Registry → Resource Integration
 # ----------------------------------------------------------------------
 
 
@@ -181,6 +196,44 @@ def test_project_can_iterate_resources():
     assert resources == [wall, south_wall]
 
 
+# ----------------------------------------------------------------------
+# Resource Graph
+# ----------------------------------------------------------------------
+
+
+def test_project_owns_resource_graph():
+    project = AtlasProject(name="Residential Project")
+
+    assert isinstance(project.graph, AtlasResourceGraph)
+    assert project.graph.count == 0
+
+
+def test_project_graph_is_stable():
+    project = AtlasProject(name="Residential Project")
+
+    graph = project.graph
+
+    assert project.graph is graph
+
+
+def test_projects_have_independent_graphs():
+    first = AtlasProject(name="Project A")
+    second = AtlasProject(name="Project B")
+
+    assert first.graph is not second.graph
+
+
+def test_project_resource_registry_and_graph_are_independent():
+    project = AtlasProject(name="Residential Project")
+
+    assert project.resources is not project.graph
+
+
+# ----------------------------------------------------------------------
+# Representation
+# ----------------------------------------------------------------------
+
+
 def test_project_repr():
     project = AtlasProject(name="Residential Project")
 
@@ -189,3 +242,4 @@ def test_project_repr():
     assert "AtlasProject" in representation
     assert "Residential Project" in representation
     assert "resources=0" in representation
+    assert "relationships=0" in representation

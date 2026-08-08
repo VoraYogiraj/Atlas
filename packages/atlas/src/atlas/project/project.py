@@ -1,15 +1,17 @@
 """
 Atlas Project
 
-Defines the top-level project context that owns Atlas Resources.
+Defines the top-level project context that owns Atlas Resources
+and their relationships.
 
 Specification:
-    ENG-009 — Atlas Project
+    ENG-009 / ENG-011 — Atlas Project + Resource Graph Integration
 """
 
 from __future__ import annotations
 
 from atlas.core.aid import AtlasID
+from atlas.graph import AtlasResourceGraph
 from atlas.resource_registry import AtlasResourceRegistry
 
 
@@ -17,12 +19,17 @@ class AtlasProject:
     """
     Top-level container for an Atlas project.
 
-    An AtlasProject owns its Resource Registry and provides
-    project-level identity, naming, and metadata.
+    An AtlasProject owns:
 
-    A Project does not directly manage individual Resource
-    implementation details. Those concerns belong to the
-    Resource and Resource Registry layers.
+        - Project identity
+        - Project name
+        - Project metadata
+        - Resource Registry
+        - Resource Graph
+
+    The Resource Registry owns Resources.
+
+    The Resource Graph manages Relationships between Resources.
     """
 
     def __init__(
@@ -36,7 +43,9 @@ class AtlasProject:
         self._id = AtlasID.generate()
         self._name = name
         self._metadata: dict[str, object] = {}
+
         self._registry = AtlasResourceRegistry()
+        self._graph = AtlasResourceGraph()
 
     # ------------------------------------------------------------------
     # Identity
@@ -85,6 +94,17 @@ class AtlasProject:
         return self._registry
 
     # ------------------------------------------------------------------
+    # Resource Graph
+    # ------------------------------------------------------------------
+
+    @property
+    def graph(self) -> AtlasResourceGraph:
+        """
+        Return the Resource Graph owned by this Project.
+        """
+        return self._graph
+
+    # ------------------------------------------------------------------
     # Representation
     # ------------------------------------------------------------------
 
@@ -93,5 +113,6 @@ class AtlasProject:
             f"{self.__class__.__name__}("
             f"aid={self.aid}, "
             f"name='{self.name}', "
-            f"resources={self.resources.count})"
+            f"resources={self.resources.count}, "
+            f"relationships={self.graph.count})"
         )
