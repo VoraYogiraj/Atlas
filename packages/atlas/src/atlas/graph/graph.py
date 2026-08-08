@@ -5,6 +5,7 @@ Provides project-level relationship management between Atlas Resources.
 
 Specification:
     ENG-011 — Resource Graph
+    ENG-012 — Project Graph Integrity
 """
 
 from __future__ import annotations
@@ -13,20 +14,82 @@ from collections.abc import Iterator
 
 from atlas.core.resource import AtlasResource
 from atlas.relationships.relationship import AtlasRelationship
+from atlas.resource_registry import AtlasResourceRegistry
 
 
 class AtlasResourceGraph:
     """
     Project-level graph of Atlas Resources and their relationships.
 
-    The graph does not own Resource objects. Resource ownership remains
-    with AtlasResourceRegistry.
+    The graph does not own Resource objects.
 
-    The graph manages relationships between registered Resources.
+    Resource ownership remains with AtlasResourceRegistry.
+
+    The graph manages Relationships between Resources that belong
+    to its associated Resource Registry.
     """
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        resources: AtlasResourceRegistry,
+    ) -> None:
+        self._resources = resources
         self._relationships: list[AtlasRelationship] = []
+
+    # ------------------------------------------------------------------
+    # Resource Registry
+    # ------------------------------------------------------------------
+
+    @property
+    def resources(self) -> AtlasResourceRegistry:
+        """
+        Return the Resource Registry associated with this graph.
+        """
+        return self._resources
+
+    # ------------------------------------------------------------------
+    # Integrity
+    # ------------------------------------------------------------------
+
+    def _validate_resource(
+        self,
+        resource: AtlasResource,
+    ) -> None:
+        """
+        Ensure that a Resource belongs to this graph's Resource Registry.
+
+        Raises
+        ------
+        ValueError
+            If the Resource does not belong to the associated registry.
+        """
+        if not self._resources.contains(resource.aid):
+            raise ValueError(
+                f"Resource does not belong to graph registry: "
+                f"{resource.aid}"
+            )
+
+    def _validate_relationship(
+        self,
+        relationship: AtlasRelationship,
+    ) -> None:
+        """
+        Ensure both endpoints of a Relationship belong to this graph.
+        """
+        source = self._resources.get(relationship.source)
+        target = self._resources.get(relationship.target)
+
+        if source is None:
+            raise ValueError(
+                f"Relationship source Resource is not registered: "
+                f"{relationship.source}"
+            )
+
+        if target is None:
+            raise ValueError(
+                f"Relationship target Resource is not registered: "
+                f"{relationship.target}"
+            )
 
     # ------------------------------------------------------------------
     # Relationship Registration
@@ -37,13 +100,19 @@ class AtlasResourceGraph:
         relationship: AtlasRelationship,
     ) -> None:
         """
-        Add a relationship to the graph.
+        Add a Relationship to the graph.
+
+        Both endpoint Resources must belong to this graph's
+        Resource Registry.
 
         Raises
         ------
         ValueError
-            If the relationship is already present.
+            If either endpoint is not registered or the relationship
+            already exists.
         """
+        self._validate_relationship(relationship)
+
         if relationship in self._relationships:
             raise ValueError(
                 "Relationship already exists in graph"
@@ -59,7 +128,7 @@ class AtlasResourceGraph:
         self,
         relationship: AtlasRelationship,
     ) -> bool:
-        """Return True if the relationship exists in the graph."""
+        """Return True if the Relationship exists in the graph."""
         return relationship in self._relationships
 
     def get_between(
@@ -68,10 +137,13 @@ class AtlasResourceGraph:
         second: AtlasResource,
     ) -> list[AtlasRelationship]:
         """
-        Return relationships connecting two Resources.
+        Return Relationships connecting two Resources.
 
-        Relationships are matched using the Resources' AtlasIDs.
+        Both Resources must belong to this graph.
         """
+        self._validate_resource(first)
+        self._validate_resource(second)
+
         first_id = first.aid
         second_id = second.aid
 
@@ -93,11 +165,12 @@ class AtlasResourceGraph:
         resource: AtlasResource,
     ) -> list[AtlasRelationship]:
         """
-        Return all relationships involving a Resource.
+        Return all Relationships involving a Resource.
 
-        Resource participation is determined by comparing the
-        Resource's AtlasID with the relationship source and target IDs.
+        The Resource must belong to this graph.
         """
+        self._validate_resource(resource)
+
         resource_id = resource.aid
 
         return [
@@ -118,7 +191,7 @@ class AtlasResourceGraph:
         relationship: AtlasRelationship,
     ) -> AtlasRelationship | None:
         """
-        Remove and return a relationship.
+        Remove and return a Relationship.
 
         Returns None if it is not present.
         """
@@ -134,17 +207,17 @@ class AtlasResourceGraph:
 
     @property
     def count(self) -> int:
-        """Return the number of relationships in the graph."""
+        """Return the number of Relationships in the graph."""
         return len(self._relationships)
 
     def __len__(self) -> int:
-        """Return the number of relationships in the graph."""
+        """Return the number of Relationships in the graph."""
         return len(self._relationships)
 
     def __iter__(self) -> Iterator[AtlasRelationship]:
-        """Iterate over relationships."""
+        """Iterate over Relationships."""
         return iter(self._relationships)
 
     def clear(self) -> None:
-        """Remove all relationships from the graph."""
+        """Remove all Relationships from the graph."""
         self._relationships.clear()

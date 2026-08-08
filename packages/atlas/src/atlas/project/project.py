@@ -45,7 +45,7 @@ class AtlasProject:
         self._metadata: dict[str, object] = {}
 
         self._registry = AtlasResourceRegistry()
-        self._graph = AtlasResourceGraph()
+        self._graph = AtlasResourceGraph(self._registry)
 
     # ------------------------------------------------------------------
     # Identity
