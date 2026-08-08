@@ -6,6 +6,7 @@ Provides project-level relationship management between Atlas Resources.
 Specification:
     ENG-011 — Resource Graph
     ENG-012 — Project Graph Integrity
+    ENG-013 — Graph Queries
 """
 
 from __future__ import annotations
@@ -183,6 +184,83 @@ class AtlasResourceGraph:
         ]
 
     # ------------------------------------------------------------------
+    # Graph Queries
+    # ------------------------------------------------------------------
+
+    def neighbors(
+        self,
+        resource: AtlasResource,
+    ) -> list[AtlasResource]:
+        """
+        Return Resources directly connected to a Resource.
+
+        The returned Resources are resolved through the graph's
+        Resource Registry.
+
+        Raises
+        ------
+        ValueError
+            If the Resource does not belong to this graph.
+        """
+        self._validate_resource(resource)
+
+        resource_id = resource.aid
+        neighbor_ids: list = []
+
+        for relationship in self._relationships:
+            if relationship.source == resource_id:
+                neighbor_ids.append(relationship.target)
+
+            elif relationship.target == resource_id:
+                neighbor_ids.append(relationship.source)
+
+        return [
+            self._resources.require(resource_id)
+            for resource_id in neighbor_ids
+        ]
+
+    def relationships_of_type(
+        self,
+        resource: AtlasResource,
+        relationship_type: str,
+    ) -> list[AtlasRelationship]:
+        """
+        Return relationships of a specific type involving a Resource.
+
+        Raises
+        ------
+        ValueError
+            If the Resource does not belong to this graph.
+        """
+        self._validate_resource(resource)
+
+        resource_id = resource.aid
+
+        return [
+            relationship
+            for relationship in self._relationships
+            if (
+                relationship.source == resource_id
+                or relationship.target == resource_id
+            )
+            and relationship.relationship_type == relationship_type
+        ]
+
+    def connected(
+        self,
+        first: AtlasResource,
+        second: AtlasResource,
+    ) -> bool:
+        """
+        Return True if two Resources are directly connected.
+
+        This checks direct relationships only.
+
+        It does not perform multi-hop graph traversal.
+        """
+        return bool(self.get_between(first, second))
+
+    # ------------------------------------------------------------------
     # Removal
     # ------------------------------------------------------------------
 
@@ -199,6 +277,7 @@ class AtlasResourceGraph:
             return None
 
         self._relationships.remove(relationship)
+
         return relationship
 
     # ------------------------------------------------------------------
