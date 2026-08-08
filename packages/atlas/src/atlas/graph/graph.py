@@ -69,12 +69,23 @@ class AtlasResourceGraph:
     ) -> list[AtlasRelationship]:
         """
         Return relationships connecting two Resources.
+
+        Relationships are matched using the Resources' AtlasIDs.
         """
+        first_id = first.aid
+        second_id = second.aid
+
         return [
             relationship
             for relationship in self._relationships
-            if relationship.involves(first)
-            and relationship.involves(second)
+            if (
+                relationship.source == first_id
+                and relationship.target == second_id
+            )
+            or (
+                relationship.source == second_id
+                and relationship.target == first_id
+            )
         ]
 
     def for_resource(
@@ -83,11 +94,19 @@ class AtlasResourceGraph:
     ) -> list[AtlasRelationship]:
         """
         Return all relationships involving a Resource.
+
+        Resource participation is determined by comparing the
+        Resource's AtlasID with the relationship source and target IDs.
         """
+        resource_id = resource.aid
+
         return [
             relationship
             for relationship in self._relationships
-            if relationship.involves(resource)
+            if (
+                relationship.source == resource_id
+                or relationship.target == resource_id
+            )
         ]
 
     # ------------------------------------------------------------------
