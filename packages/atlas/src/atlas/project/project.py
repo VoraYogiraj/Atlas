@@ -18,6 +18,7 @@ Specifications:
     ENG-012 — Project Graph Integrity
     ENG-018 — Classification Registry
     ENG-019 — Project Classification Integrity
+    ENG-022 — Project Relationship Queries
 """
 
 from __future__ import annotations
@@ -519,6 +520,79 @@ class AtlasProject:
         )
 
         return relationship
+
+    # ------------------------------------------------------------------
+    # ENG-022 — Project Relationship Queries
+    # ------------------------------------------------------------------
+
+    def relationships_for_resource(
+        self,
+        resource: AtlasResource,
+    ) -> list[AtlasRelationship]:
+        """
+        Return all Relationships involving a Resource.
+
+        Relationship direction is ignored.
+
+        The Resource must belong to this Project.
+        """
+        return self._graph.for_resource(
+            resource
+        )
+
+    def outgoing_relationships(
+        self,
+        resource: AtlasResource,
+    ) -> list[AtlasRelationship]:
+        """
+        Return Relationships originating from a Resource.
+
+        Only Relationships where the Resource is the source
+        are returned.
+
+        The Resource must belong to this Project.
+        """
+        return self._graph.outgoing(
+            resource
+        )
+
+    def incoming_relationships(
+        self,
+        resource: AtlasResource,
+    ) -> list[AtlasRelationship]:
+        """
+        Return Relationships terminating at a Resource.
+
+        Only Relationships where the Resource is the target
+        are returned.
+
+        The Resource must belong to this Project.
+        """
+        return self._graph.incoming(
+            resource
+        )
+
+    def relationships_by_type(
+        self,
+        relationship_type: str,
+    ) -> list[AtlasRelationship]:
+        """
+        Return all Relationships of a specific type.
+
+        Registration order is preserved.
+
+        Raises
+        ------
+        ValueError
+            If relationship_type is empty or whitespace.
+        """
+        return self._graph.for_relationship_type(
+            relationship_type
+        )
+
+    # ------------------------------------------------------------------
+    # Relationship Removal
+    # ------------------------------------------------------------------
 
     def remove_relationship(
         self,
