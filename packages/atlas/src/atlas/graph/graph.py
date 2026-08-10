@@ -271,6 +271,53 @@ class AtlasResourceGraph:
     # Graph Traversal
     # ------------------------------------------------------------------
 
+    def _traversal_neighbors(
+        self,
+        resource: AtlasResource,
+    ) -> list[AtlasResource]:
+        """
+        Return traversal neighbors with outgoing relationships
+        visited before incoming relationships.
+
+        Relationship direction does not restrict reachability, but
+        direction provides deterministic traversal ordering.
+
+        Outgoing relationships are returned first, followed by
+        incoming relationships.
+
+        Duplicate Resources are removed while preserving order.
+        """
+        self._validate_resource(resource)
+
+        resource_id = resource.aid
+
+        outgoing_ids = []
+        incoming_ids = []
+
+        for relationship in self._relationships:
+            if relationship.source.aid == resource_id:
+                if relationship.target.aid not in outgoing_ids:
+                    outgoing_ids.append(
+                        relationship.target.aid
+                    )
+
+            elif relationship.target.aid == resource_id:
+                if relationship.source.aid not in incoming_ids:
+                    incoming_ids.append(
+                        relationship.source.aid
+                    )
+
+        neighbor_ids = outgoing_ids + [
+            neighbor_id
+            for neighbor_id in incoming_ids
+            if neighbor_id not in outgoing_ids
+        ]
+
+        return [
+            self._resources.require(neighbor_id)
+            for neighbor_id in neighbor_ids
+        ]
+
     def traverse(
         self,
         resource: AtlasResource,
@@ -282,9 +329,7 @@ class AtlasResourceGraph:
 
         The starting Resource is always included in the result.
 
-        Traversal is direction-independent: Relationships are treated
-        as connections between Resources regardless of their declared
-        source/target direction.
+        Relationship direction does not restrict traversal.
 
         Parameters
         ----------
@@ -292,19 +337,19 @@ class AtlasResourceGraph:
             Resource from which traversal begins.
 
         max_depth:
-            Maximum number of relationship hops to traverse.
+            Maximum number of relationship hops.
 
-            None
-                Traverse until all reachable Resources are visited.
+            None:
+                Traverse all reachable Resources.
 
-            0
+            0:
                 Return only the starting Resource.
 
-            1
-                Return the starting Resource and its direct neighbors.
+            1:
+                Return the starting Resource and direct neighbors.
 
-            2
-                Continue through Resources two relationships away.
+            2:
+                Traverse up to two relationship hops.
 
         Returns
         -------
@@ -314,7 +359,7 @@ class AtlasResourceGraph:
         Raises
         ------
         ValueError
-            If the starting Resource does not belong to this graph.
+            If the Resource is not registered with this graph.
 
             If max_depth is negative.
         """
@@ -344,7 +389,7 @@ class AtlasResourceGraph:
             ):
                 continue
 
-            for neighbor in self.neighbors(current):
+            for neighbor in self._traversal_neighbors(current):
                 if neighbor.aid in visited:
                     continue
 
@@ -365,12 +410,11 @@ class AtlasResourceGraph:
         target: AtlasResource,
     ) -> bool:
         """
-        Return True if target is reachable from source through one or
-        more graph relationships.
+        Return True if target is reachable from source.
 
-        Traversal is direction-independent and supports multi-hop paths.
+        Traversal is multi-hop and relationship direction-independent.
 
-        A Resource is always reachable from itself.
+        A Resource is reachable from itself.
 
         Raises
         ------
@@ -385,12 +429,14 @@ class AtlasResourceGraph:
 
         visited = {source.aid}
 
-        queue: deque[AtlasResource] = deque([source])
+        queue: deque[AtlasResource] = deque(
+            [source]
+        )
 
         while queue:
             current = queue.popleft()
 
-            for neighbor in self.neighbors(current):
+            for neighbor in self._traversal_neighbors(current):
                 if neighbor.aid in visited:
                     continue
 
