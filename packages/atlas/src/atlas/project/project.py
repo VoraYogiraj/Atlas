@@ -5,12 +5,13 @@ Defines the top-level project context that owns Atlas Resources
 and their relationships.
 
 Specification:
-    ENG-009 / ENG-011 — Atlas Project + Resource Graph Integration
+ENG-009 / ENG-011 — Atlas Project + Resource Graph Integration
 """
 
 from __future__ import annotations
 
 from atlas.core.aid import AtlasID
+from atlas.core.resource import AtlasResource
 from atlas.graph import AtlasResourceGraph
 from atlas.resource_registry import AtlasResourceRegistry
 
@@ -92,6 +93,57 @@ class AtlasProject:
         Return the Resource Registry owned by this Project.
         """
         return self._registry
+
+    # ------------------------------------------------------------------
+    # Resource API
+    # ------------------------------------------------------------------
+
+    def add_resource(
+        self,
+        resource: AtlasResource,
+    ) -> AtlasResource:
+        """
+        Add a Resource to this Project.
+
+        Resource ownership remains with the Project's Resource Registry.
+
+        Parameters
+        ----------
+        resource:
+            Resource to register with the Project.
+
+        Returns
+        -------
+        AtlasResource
+            The same Resource instance that was registered.
+
+        Raises
+        ------
+        ValueError
+            If a Resource with the same identity is already registered.
+        """
+        self._registry.register(resource)
+
+        return resource
+
+    def remove_resource(
+        self,
+        resource: AtlasResource,
+    ) -> AtlasResource | None:
+        """
+        Remove a Resource from this Project.
+
+        Parameters
+        ----------
+        resource:
+            Resource to remove.
+
+        Returns
+        -------
+        AtlasResource | None
+            The removed Resource, or None if it is not registered.
+        """
+        return self._registry.unregister(resource.aid)
 
     # ------------------------------------------------------------------
     # Resource Graph
