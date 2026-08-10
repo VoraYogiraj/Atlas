@@ -441,6 +441,335 @@ def test_project_resources_remain_owned_by_registry():
 
 
 # ----------------------------------------------------------------------
+# Project Relationship API
+# ----------------------------------------------------------------------
+
+
+def test_project_add_relationship_adds_to_graph():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    room = create_resource(
+        "Living Room"
+    )
+
+    project.add_resource(wall)
+    project.add_resource(room)
+
+    relationship = AtlasRelationship(
+        id="wall-room-relationship",
+        relationship_type="bounds",
+        source=wall,
+        target=room,
+    )
+
+    project.add_relationship(
+        relationship
+    )
+
+    assert project.graph.contains(
+        relationship
+    )
+
+    assert project.graph.count == 1
+
+
+def test_project_add_relationship_returns_relationship():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    room = create_resource(
+        "Living Room"
+    )
+
+    project.add_resource(wall)
+    project.add_resource(room)
+
+    relationship = AtlasRelationship(
+        id="wall-room-relationship",
+        relationship_type="bounds",
+        source=wall,
+        target=room,
+    )
+
+    result = project.add_relationship(
+        relationship
+    )
+
+    assert result is relationship
+
+
+def test_project_add_relationship_rejects_duplicate():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    room = create_resource(
+        "Living Room"
+    )
+
+    project.add_resource(wall)
+    project.add_resource(room)
+
+    relationship = AtlasRelationship(
+        id="wall-room-relationship",
+        relationship_type="bounds",
+        source=wall,
+        target=room,
+    )
+
+    project.add_relationship(
+        relationship
+    )
+
+    try:
+        project.add_relationship(
+            relationship
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Expected duplicate Relationship "
+            "to raise ValueError"
+        )
+
+
+def test_project_add_relationship_rejects_foreign_source():
+    first = AtlasProject(
+        name="Project A"
+    )
+
+    second = AtlasProject(
+        name="Project B"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    room = create_resource(
+        "Living Room"
+    )
+
+    first.add_resource(wall)
+    second.add_resource(room)
+
+    relationship = AtlasRelationship(
+        id="cross-project-source",
+        relationship_type="bounds",
+        source=wall,
+        target=room,
+    )
+
+    try:
+        first.add_relationship(
+            relationship
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Expected cross-project source "
+            "to raise ValueError"
+        )
+
+
+def test_project_add_relationship_rejects_foreign_target():
+    first = AtlasProject(
+        name="Project A"
+    )
+
+    second = AtlasProject(
+        name="Project B"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    room = create_resource(
+        "Living Room"
+    )
+
+    first.add_resource(wall)
+    second.add_resource(room)
+
+    relationship = AtlasRelationship(
+        id="cross-project-target",
+        relationship_type="bounds",
+        source=wall,
+        target=room,
+    )
+
+    try:
+        first.add_relationship(
+            relationship
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Expected cross-project target "
+            "to raise ValueError"
+        )
+
+
+def test_project_remove_relationship_removes_from_graph():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    room = create_resource(
+        "Living Room"
+    )
+
+    project.add_resource(wall)
+    project.add_resource(room)
+
+    relationship = AtlasRelationship(
+        id="wall-room-relationship",
+        relationship_type="bounds",
+        source=wall,
+        target=room,
+    )
+
+    project.add_relationship(
+        relationship
+    )
+
+    removed = project.remove_relationship(
+        relationship
+    )
+
+    assert removed is relationship
+
+    assert not project.graph.contains(
+        relationship
+    )
+
+    assert project.graph.count == 0
+
+
+def test_project_remove_missing_relationship_returns_none():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    room = create_resource(
+        "Living Room"
+    )
+
+    project.add_resource(wall)
+    project.add_resource(room)
+
+    relationship = AtlasRelationship(
+        id="missing-relationship",
+        relationship_type="bounds",
+        source=wall,
+        target=room,
+    )
+
+    assert project.remove_relationship(
+        relationship
+    ) is None
+
+
+def test_project_relationship_does_not_change_resource_count():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    room = create_resource(
+        "Living Room"
+    )
+
+    project.add_resource(wall)
+    project.add_resource(room)
+
+    relationship = AtlasRelationship(
+        id="wall-room-relationship",
+        relationship_type="bounds",
+        source=wall,
+        target=room,
+    )
+
+    project.add_relationship(
+        relationship
+    )
+
+    assert project.resources.count == 2
+
+    project.remove_relationship(
+        relationship
+    )
+
+    assert project.resources.count == 2
+
+
+def test_project_relationship_preserves_resource_ownership():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    room = create_resource(
+        "Living Room"
+    )
+
+    project.add_resource(wall)
+    project.add_resource(room)
+
+    relationship = AtlasRelationship(
+        id="wall-room-relationship",
+        relationship_type="bounds",
+        source=wall,
+        target=room,
+    )
+
+    project.add_relationship(
+        relationship
+    )
+
+    assert project.resources.get(
+        wall.aid
+    ) is wall
+
+    assert project.resources.get(
+        room.aid
+    ) is room
+
+
+# ----------------------------------------------------------------------
 # Representation
 # ----------------------------------------------------------------------
 
