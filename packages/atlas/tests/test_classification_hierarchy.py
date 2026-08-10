@@ -406,3 +406,265 @@ def test_hierarchy_rejects_child_when_parent_was_removed():
         raise AssertionError(
             "Expected removed parent to invalidate child registration"
         )
+
+
+# ----------------------------------------------------------------------
+# Hierarchy Queries
+# ----------------------------------------------------------------------
+
+
+def test_hierarchy_roots_returns_registered_root_classifications():
+    hierarchy = AtlasClassificationHierarchy()
+
+    physical = create_root(
+        id="physical",
+        name="Physical Resource",
+    )
+
+    document = create_root(
+        id="document",
+        name="Document",
+    )
+
+    building = create_building(physical)
+
+    hierarchy.add(physical)
+    hierarchy.add(document)
+    hierarchy.add(building)
+
+    assert hierarchy.roots() == [
+        physical,
+        document,
+    ]
+
+
+def test_hierarchy_roots_excludes_child_classifications():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+
+    assert hierarchy.roots() == [root]
+
+
+def test_hierarchy_children_returns_direct_children():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+
+    wall = create_wall(root)
+
+    door = AtlasClassification(
+        id="door",
+        name="Door",
+        parent=root,
+    )
+
+    window = AtlasClassification(
+        id="window",
+        name="Window",
+        parent=root,
+    )
+
+    hierarchy.add(root)
+    hierarchy.add(wall)
+    hierarchy.add(door)
+    hierarchy.add(window)
+
+    assert hierarchy.children(root) == [
+        wall,
+        door,
+        window,
+    ]
+
+
+def test_hierarchy_children_excludes_grandchildren():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+    wall = create_wall(building)
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+    hierarchy.add(wall)
+
+    assert hierarchy.children(root) == [
+        building,
+    ]
+
+
+def test_hierarchy_children_returns_empty_for_leaf():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+    wall = create_wall(building)
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+    hierarchy.add(wall)
+
+    assert hierarchy.children(wall) == []
+
+
+def test_hierarchy_parent_returns_direct_parent():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+    wall = create_wall(building)
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+    hierarchy.add(wall)
+
+    assert hierarchy.parent(wall) is building
+
+
+def test_hierarchy_parent_returns_none_for_root():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+
+    hierarchy.add(root)
+
+    assert hierarchy.parent(root) is None
+
+
+def test_hierarchy_ancestors_returns_parent_to_root():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+    wall = create_wall(building)
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+    hierarchy.add(wall)
+
+    assert hierarchy.ancestors(wall) == [
+        building,
+        root,
+    ]
+
+
+def test_hierarchy_ancestors_returns_empty_for_root():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+
+    hierarchy.add(root)
+
+    assert hierarchy.ancestors(root) == []
+
+
+def test_hierarchy_descendants_returns_all_descendants():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+    wall = create_wall(building)
+
+    door = AtlasClassification(
+        id="door",
+        name="Door",
+        parent=building,
+    )
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+    hierarchy.add(wall)
+    hierarchy.add(door)
+
+    assert hierarchy.descendants(building) == [
+        wall,
+        door,
+    ]
+
+
+def test_hierarchy_descendants_returns_nested_descendants():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+    wall = create_wall(building)
+
+    door = AtlasClassification(
+        id="door",
+        name="Door",
+        parent=wall,
+    )
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+    hierarchy.add(wall)
+    hierarchy.add(door)
+
+    assert hierarchy.descendants(building) == [
+        wall,
+        door,
+    ]
+
+
+def test_hierarchy_descendants_returns_empty_for_leaf():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+    wall = create_wall(building)
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+    hierarchy.add(wall)
+
+    assert hierarchy.descendants(wall) == []
+
+
+def test_hierarchy_queries_reject_unregistered_classification():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+
+    try:
+        hierarchy.children(root)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Expected children() to reject "
+            "unregistered classification"
+        )
+
+    try:
+        hierarchy.parent(root)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Expected parent() to reject "
+            "unregistered classification"
+        )
+
+    try:
+        hierarchy.ancestors(root)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Expected ancestors() to reject "
+            "unregistered classification"
+        )
+
+    try:
+        hierarchy.descendants(root)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Expected descendants() to reject "
+            "unregistered classification"
+        )
