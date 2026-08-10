@@ -210,3 +210,199 @@ def test_hierarchy_clear():
     assert hierarchy.count == 0
     assert not hierarchy.contains(root.id)
     assert not hierarchy.contains(building.id)
+
+
+# ----------------------------------------------------------------------
+# Parent Integrity
+# ----------------------------------------------------------------------
+
+
+def test_hierarchy_allows_root_without_parent():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+
+    result = hierarchy.add(root)
+
+    assert result is root
+    assert hierarchy.contains(root.id)
+
+
+def test_hierarchy_requires_registered_parent():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+
+    try:
+        hierarchy.add(building)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Expected unregistered parent to raise ValueError"
+        )
+
+
+def test_hierarchy_allows_child_when_parent_registered():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+
+    assert hierarchy.contains(root.id)
+    assert hierarchy.contains(building.id)
+
+
+def test_hierarchy_requires_registered_parent_for_grandchild():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+    wall = create_wall(building)
+
+    hierarchy.add(root)
+
+    try:
+        hierarchy.add(wall)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Expected unregistered parent to raise ValueError"
+        )
+
+
+def test_hierarchy_allows_grandchild_when_parent_chain_registered():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+    wall = create_wall(building)
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+    hierarchy.add(wall)
+
+    assert hierarchy.count == 3
+    assert hierarchy.contains(wall.id)
+
+
+def test_hierarchy_supports_multiple_roots():
+    hierarchy = AtlasClassificationHierarchy()
+
+    physical = create_root(
+        id="physical",
+        name="Physical Resource",
+    )
+
+    document = create_root(
+        id="document",
+        name="Document",
+    )
+
+    hierarchy.add(physical)
+    hierarchy.add(document)
+
+    assert hierarchy.count == 2
+    assert hierarchy.contains(physical.id)
+    assert hierarchy.contains(document.id)
+
+
+def test_hierarchy_supports_multiple_children():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+
+    wall = create_wall(root)
+
+    door = AtlasClassification(
+        id="door",
+        name="Door",
+        parent=root,
+    )
+
+    hierarchy.add(root)
+    hierarchy.add(wall)
+    hierarchy.add(door)
+
+    assert hierarchy.count == 3
+
+
+def test_hierarchy_rejects_removing_parent_with_children():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+
+    try:
+        hierarchy.remove(root.id)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Expected parent with registered children "
+            "to raise ValueError"
+        )
+
+
+def test_hierarchy_allows_removing_leaf_classification():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+
+    removed = hierarchy.remove(building.id)
+
+    assert removed is building
+    assert hierarchy.contains(root.id)
+    assert not hierarchy.contains(building.id)
+    assert hierarchy.count == 1
+
+
+def test_hierarchy_allows_removing_root_after_children_removed():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+
+    hierarchy.remove(building.id)
+
+    removed = hierarchy.remove(root.id)
+
+    assert removed is root
+    assert hierarchy.count == 0
+
+
+def test_hierarchy_rejects_child_when_parent_was_removed():
+    hierarchy = AtlasClassificationHierarchy()
+
+    root = create_root()
+    building = create_building(root)
+    wall = create_wall(building)
+
+    hierarchy.add(root)
+    hierarchy.add(building)
+
+    hierarchy.remove(building.id)
+
+    try:
+        hierarchy.add(wall)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Expected removed parent to invalidate child registration"
+        )
