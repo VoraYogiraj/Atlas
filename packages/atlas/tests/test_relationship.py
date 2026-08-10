@@ -208,3 +208,104 @@ def test_relationship_description_is_preserved():
     assert relationship.description == (
         "Wall contains the door opening."
     )
+
+
+# ----------------------------------------------------------------------
+# Relationship Direction Semantics
+# ----------------------------------------------------------------------
+
+
+def test_relationship_is_from_source():
+    wall = create_resource("Wall")
+    door = create_resource("Door")
+
+    relationship = AtlasRelationship(
+        id="contains",
+        relationship_type="contains",
+        source=wall,
+        target=door,
+    )
+
+    assert relationship.is_from(wall)
+    assert not relationship.is_from(door)
+
+
+def test_relationship_is_to_target():
+    wall = create_resource("Wall")
+    door = create_resource("Door")
+
+    relationship = AtlasRelationship(
+        id="contains",
+        relationship_type="contains",
+        source=wall,
+        target=door,
+    )
+
+    assert relationship.is_to(door)
+    assert not relationship.is_to(wall)
+
+
+def test_relationship_connects_source_to_target():
+    wall = create_resource("Wall")
+    door = create_resource("Door")
+
+    relationship = AtlasRelationship(
+        id="contains",
+        relationship_type="contains",
+        source=wall,
+        target=door,
+    )
+
+    assert relationship.connects(
+        wall,
+        door,
+    )
+
+
+def test_relationship_does_not_connect_target_to_source():
+    wall = create_resource("Wall")
+    door = create_resource("Door")
+
+    relationship = AtlasRelationship(
+        id="contains",
+        relationship_type="contains",
+        source=wall,
+        target=door,
+    )
+
+    assert not relationship.connects(
+        door,
+        wall,
+    )
+
+
+def test_relationship_connects_uses_resource_identity():
+    wall = create_resource("Wall")
+    door = create_resource("Door")
+
+    relationship = AtlasRelationship(
+        id="contains",
+        relationship_type="contains",
+        source=wall,
+        target=door,
+    )
+
+    assert relationship.connects(
+        wall,
+        door,
+    )
+
+
+def test_relationship_direction_does_not_change_involves():
+    wall = create_resource("Wall")
+    door = create_resource("Door")
+
+    relationship = AtlasRelationship(
+        id="contains",
+        relationship_type="contains",
+        source=wall,
+        target=door,
+    )
+
+    assert relationship.involves(wall)
+    assert relationship.involves(door)
