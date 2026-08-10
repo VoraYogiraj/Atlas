@@ -7,7 +7,8 @@ The Registry is an explicit container owned by a higher-level Atlas
 context such as a Project. It is not a global singleton.
 
 Specification:
-    ENG-008 — Resource Registry
+ENG-008 — Resource Registry
+ENG-021 — Resource Classification Queries
 """
 
 from __future__ import annotations
@@ -28,6 +29,7 @@ class AtlasResourceRegistry:
         - registration
         - lookup
         - existence checks
+        - classification queries
         - removal
         - iteration
         - count
@@ -40,7 +42,10 @@ class AtlasResourceRegistry:
     # Registration
     # ------------------------------------------------------------------
 
-    def register(self, resource: AtlasResource) -> None:
+    def register(
+        self,
+        resource: AtlasResource,
+    ) -> None:
         """
         Register a Resource.
 
@@ -60,7 +65,10 @@ class AtlasResourceRegistry:
     # Lookup
     # ------------------------------------------------------------------
 
-    def get(self, aid: AtlasID) -> AtlasResource | None:
+    def get(
+        self,
+        aid: AtlasID,
+    ) -> AtlasResource | None:
         """
         Return a Resource by AtlasID.
 
@@ -68,7 +76,10 @@ class AtlasResourceRegistry:
         """
         return self._resources.get(aid)
 
-    def require(self, aid: AtlasID) -> AtlasResource:
+    def require(
+        self,
+        aid: AtlasID,
+    ) -> AtlasResource:
         """
         Return a Resource by AtlasID.
 
@@ -80,13 +91,55 @@ class AtlasResourceRegistry:
         try:
             return self._resources[aid]
         except KeyError:
-            raise KeyError(f"Resource not found: {aid}") from None
+            raise KeyError(
+                f"Resource not found: {aid}"
+            ) from None
+
+    # ------------------------------------------------------------------
+    # Classification Queries
+    # ------------------------------------------------------------------
+
+    def for_classification(
+        self,
+        classification_id: str,
+    ) -> list[AtlasResource]:
+        """
+        Return all Resources belonging to a classification.
+
+        Resources are returned in registration order.
+
+        Classification matching is performed by classification ID,
+        not by classification object identity.
+
+        Parameters
+        ----------
+        classification_id:
+            ID of the Resource classification.
+
+        Raises
+        ------
+        ValueError
+            If classification_id is empty or whitespace.
+        """
+        if not classification_id.strip():
+            raise ValueError(
+                "Classification ID cannot be empty"
+            )
+
+        return [
+            resource
+            for resource in self._resources.values()
+            if resource.classification.id == classification_id
+        ]
 
     # ------------------------------------------------------------------
     # Existence
     # ------------------------------------------------------------------
 
-    def contains(self, aid: AtlasID) -> bool:
+    def contains(
+        self,
+        aid: AtlasID,
+    ) -> bool:
         """Return True if a Resource is registered."""
         return aid in self._resources
 
@@ -94,7 +147,10 @@ class AtlasResourceRegistry:
     # Removal
     # ------------------------------------------------------------------
 
-    def unregister(self, aid: AtlasID) -> AtlasResource | None:
+    def unregister(
+        self,
+        aid: AtlasID,
+    ) -> AtlasResource | None:
         """
         Remove and return a Resource.
 
@@ -115,7 +171,9 @@ class AtlasResourceRegistry:
         """Return the number of registered Resources."""
         return len(self._resources)
 
-    def __iter__(self) -> Iterator[AtlasResource]:
+    def __iter__(
+        self,
+    ) -> Iterator[AtlasResource]:
         """Iterate over registered Resources."""
         return iter(self._resources.values())
 
