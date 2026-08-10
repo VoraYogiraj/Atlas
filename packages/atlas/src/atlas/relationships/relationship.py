@@ -48,10 +48,14 @@ class AtlasRelationship:
                 "Relationship type cannot be empty"
             )
 
+    # ------------------------------------------------------------------
+    # Relationship Identity
+    # ------------------------------------------------------------------
+
     @property
     def is_self_reference(self) -> bool:
         """
-        Returns True if the relationship connects a Resource to itself.
+        Return True if the relationship connects a Resource to itself.
         """
         return self.source.aid == self.target.aid
 
@@ -60,13 +64,61 @@ class AtlasRelationship:
         resource: "AtlasResource",
     ) -> bool:
         """
-        Returns True if the supplied Resource participates
+        Return True if the supplied Resource participates
         in this relationship.
+
+        Direction is ignored.
         """
         return (
             resource.aid == self.source.aid
             or resource.aid == self.target.aid
         )
+
+    # ------------------------------------------------------------------
+    # Direction Semantics
+    # ------------------------------------------------------------------
+
+    def is_from(
+        self,
+        resource: "AtlasResource",
+    ) -> bool:
+        """
+        Return True if the supplied Resource is the source.
+
+        Relationship direction is respected.
+        """
+        return resource.aid == self.source.aid
+
+    def is_to(
+        self,
+        resource: "AtlasResource",
+    ) -> bool:
+        """
+        Return True if the supplied Resource is the target.
+
+        Relationship direction is respected.
+        """
+        return resource.aid == self.target.aid
+
+    def connects(
+        self,
+        source: "AtlasResource",
+        target: "AtlasResource",
+    ) -> bool:
+        """
+        Return True if this relationship connects the supplied
+        source Resource to the supplied target Resource.
+
+        Direction is respected.
+        """
+        return (
+            self.source.aid == source.aid
+            and self.target.aid == target.aid
+        )
+
+    # ------------------------------------------------------------------
+    # Representation
+    # ------------------------------------------------------------------
 
     def __repr__(self) -> str:
         return (
