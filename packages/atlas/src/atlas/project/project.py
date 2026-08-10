@@ -55,10 +55,14 @@ class AtlasProject:
         metadata: dict[str, Any] | None = None,
     ) -> None:
         if not isinstance(name, str):
-            raise TypeError("Project name must be a string")
+            raise TypeError(
+                "Project name must be a string"
+            )
 
         if not name.strip():
-            raise ValueError("Project name cannot be empty")
+            raise ValueError(
+                "Project name cannot be empty"
+            )
 
         self._aid = AtlasID.generate()
         self._name = name
@@ -78,7 +82,9 @@ class AtlasProject:
         # Classification context
         # --------------------------------------------------------------
 
-        self._classifications = AtlasClassificationRegistry()
+        self._classifications = (
+            AtlasClassificationRegistry()
+        )
 
         self._classification_hierarchy = (
             AtlasClassificationHierarchy()
@@ -112,12 +118,20 @@ class AtlasProject:
         return self._name
 
     @name.setter
-    def name(self, value: str) -> None:
+    def name(
+        self,
+        value: str,
+    ) -> None:
+        """Set the Project name."""
         if not isinstance(value, str):
-            raise TypeError("Project name must be a string")
+            raise TypeError(
+                "Project name must be a string"
+            )
 
         if not value.strip():
-            raise ValueError("Project name cannot be empty")
+            raise ValueError(
+                "Project name cannot be empty"
+            )
 
         self._name = value
 
@@ -128,12 +142,12 @@ class AtlasProject:
     @property
     def metadata(self) -> dict[str, Any]:
         """
-        Return Project metadata.
+        Return the Project metadata dictionary.
 
-        A copy is returned so callers cannot replace the internal
-        metadata dictionary accidentally.
+        The actual internal dictionary is returned so callers can
+        update Project metadata through the public API.
         """
-        return dict(self._metadata)
+        return self._metadata
 
     # ------------------------------------------------------------------
     # Resource Registry
@@ -147,7 +161,9 @@ class AtlasProject:
         return self._resources
 
     @property
-    def resource_registry(self) -> AtlasResourceRegistry:
+    def resource_registry(
+        self,
+    ) -> AtlasResourceRegistry:
         """
         Alias for the Project Resource Registry.
         """
@@ -165,7 +181,9 @@ class AtlasProject:
         return self._graph
 
     @property
-    def resource_graph(self) -> AtlasResourceGraph:
+    def resource_graph(
+        self,
+    ) -> AtlasResourceGraph:
         """
         Alias for the Project Resource Graph.
         """
@@ -176,7 +194,9 @@ class AtlasProject:
     # ------------------------------------------------------------------
 
     @property
-    def classifications(self) -> AtlasClassificationRegistry:
+    def classifications(
+        self,
+    ) -> AtlasClassificationRegistry:
         """
         Return the Classification Registry owned by this Project.
         """
@@ -225,25 +245,19 @@ class AtlasProject:
         -------
         AtlasClassification
             The registered Classification.
-
-        Raises
-        ------
-        ValueError
-            If the Classification already exists.
-
-            If the Classification has a parent that is not registered
-            with this Project.
         """
         classification_id = classification.id
 
-        if self._classifications.contains(classification_id):
+        if self._classifications.contains(
+            classification_id
+        ):
             raise ValueError(
-                f"Classification already registered: "
+                "Classification already registered: "
                 f"{classification_id}"
             )
 
-        # Register in the hierarchy first. This validates the parent
-        # relationship before the canonical registry is changed.
+        # Register in the hierarchy first. This validates the
+        # parent relationship before changing the registry.
         self._classification_hierarchy.add(
             classification
         )
@@ -253,7 +267,8 @@ class AtlasProject:
                 classification
             )
         except Exception:
-            # Keep both contexts transactionally consistent.
+            # Keep hierarchy and registry synchronized if registration
+            # unexpectedly fails.
             self._classification_hierarchy.remove(
                 classification_id
             )
@@ -299,14 +314,10 @@ class AtlasProject:
             - it has registered child Classifications
             - it is currently used by a registered Resource
 
-        The Classification is removed from both the hierarchy and
-        canonical registry only after all integrity checks pass.
-
         Returns
         -------
         AtlasClassification | None
-            The removed Classification, or None when it is not
-            registered.
+            The removed Classification, or None when not registered.
         """
         classification = self._classifications.get(
             classification_id
@@ -326,7 +337,8 @@ class AtlasProject:
                 f"{classification_id}"
             )
 
-        # A classification used by a Resource cannot be removed.
+        # A classification currently used by a Resource cannot
+        # be removed.
         for resource in self._resources:
             if resource.classification.id == classification_id:
                 raise ValueError(
@@ -334,7 +346,7 @@ class AtlasProject:
                     f"Resource: {classification_id}"
                 )
 
-        # Remove from hierarchy first, then canonical registry.
+        # Remove from hierarchy first.
         removed = self._classification_hierarchy.remove(
             classification_id
         )
@@ -347,8 +359,7 @@ class AtlasProject:
                 classification_id
             )
         except Exception:
-            # This should not normally occur, but preserve consistency
-            # if the registry operation unexpectedly fails.
+            # Restore hierarchy if registry removal unexpectedly fails.
             self._classification_hierarchy.add(
                 classification
             )
@@ -371,13 +382,7 @@ class AtlasProject:
         Returns
         -------
         AtlasResource
-            The registered Resource.
-
-        Raises
-        ------
-        ValueError
-            If the Resource's Classification is not registered or the
-            Resource is already registered.
+            The same Resource instance that was registered.
         """
         classification_id = resource.classification.id
 
@@ -389,9 +394,11 @@ class AtlasProject:
                 f"with this Project: {classification_id}"
             )
 
-        return self._resources.register(
+        self._resources.register(
             resource
         )
+
+        return resource
 
     def get_resource(
         self,
@@ -402,7 +409,9 @@ class AtlasProject:
 
         Returns None when the Resource is not registered.
         """
-        return self._resources.get(aid)
+        return self._resources.get(
+            aid
+        )
 
     def require_resource(
         self,
@@ -413,7 +422,9 @@ class AtlasProject:
 
         Raises KeyError when the Resource is not registered.
         """
-        return self._resources.require(aid)
+        return self._resources.require(
+            aid
+        )
 
     def remove_resource(
         self,
@@ -437,8 +448,6 @@ class AtlasProject:
         if registered is None:
             return None
 
-        # Remove relationships involving the Resource so the graph
-        # never retains references to an unregistered Resource.
         relationships = self._graph.for_resource(
             registered
         )
@@ -453,13 +462,8 @@ class AtlasProject:
         )
 
     # ------------------------------------------------------------------
-    # Resource Queries
+    # Resource Classification Queries
     # ------------------------------------------------------------------
-
-    @property
-    def resource_count(self) -> int:
-        """Return the number of Resources in this Project."""
-        return self._resources.count
 
     def resources_for_classification(
         self,
@@ -468,10 +472,14 @@ class AtlasProject:
         """
         Return Resources belonging to a Classification.
 
-        The query is Project-scoped and uses Classification ID
-        identity rather than object identity.
+        Matching is performed using Classification ID.
+
+        Resources are returned in Resource Registry order.
         """
-        if not isinstance(classification_id, str):
+        if not isinstance(
+            classification_id,
+            str,
+        ):
             raise TypeError(
                 "classification_id must be a string"
             )
@@ -504,7 +512,7 @@ class AtlasProject:
         Returns
         -------
         AtlasRelationship
-            The registered Relationship.
+            The same Relationship instance that was registered.
         """
         self._graph.add_relationship(
             relationship
@@ -526,11 +534,18 @@ class AtlasProject:
             relationship
         )
 
+    # ------------------------------------------------------------------
+    # Counts
+    # ------------------------------------------------------------------
+
+    @property
+    def resource_count(self) -> int:
+        """Return the number of Resources in this Project."""
+        return self._resources.count
+
     @property
     def relationship_count(self) -> int:
-        """
-        Return the number of Relationships in this Project.
-        """
+        """Return the number of Relationships in this Project."""
         return self._graph.count
 
     # ------------------------------------------------------------------
@@ -538,9 +553,7 @@ class AtlasProject:
     # ------------------------------------------------------------------
 
     def __len__(self) -> int:
-        """
-        Return the number of Resources in the Project.
-        """
+        """Return the number of Resources in the Project."""
         return self._resources.count
 
     # ------------------------------------------------------------------
