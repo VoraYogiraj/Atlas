@@ -1,15 +1,18 @@
 """
 Atlas Project
 
-Defines the top-level project context that owns Atlas Resources
-and their relationships.
+Defines the top-level project context that owns Atlas Resources,
+Relationships, Classifications, and Classification Hierarchy.
 
 Specification:
-ENG-009 / ENG-011 — Atlas Project + Resource Graph Integration
+ENG-009 / ENG-011 / ENG-019
 """
 
 from __future__ import annotations
 
+from atlas.classification.classification import AtlasClassification
+from atlas.classification.hierarchy import AtlasClassificationHierarchy
+from atlas.classification.registry import AtlasClassificationRegistry
 from atlas.core.aid import AtlasID
 from atlas.core.resource import AtlasResource
 from atlas.graph import AtlasResourceGraph
@@ -26,12 +29,22 @@ class AtlasProject:
         - Project identity
         - Project name
         - Project metadata
+        - Classification Registry
+        - Classification Hierarchy
         - Resource Registry
         - Resource Graph
+
+    The Classification Registry owns classification registrations.
+
+    The Classification Hierarchy manages parent/child relationships
+    between registered classifications.
 
     The Resource Registry owns Resources.
 
     The Resource Graph manages Relationships between Resources.
+
+    The project acts as the integration boundary between these
+    subsystems.
     """
 
     def __init__(
@@ -45,6 +58,19 @@ class AtlasProject:
         self._id = AtlasID.generate()
         self._name = name
         self._metadata: dict[str, object] = {}
+
+        # --------------------------------------------------------------
+        # Classification Context
+        # --------------------------------------------------------------
+
+        self._classifications = AtlasClassificationRegistry()
+        self._classification_hierarchy = (
+            AtlasClassificationHierarchy()
+        )
+
+        # --------------------------------------------------------------
+        # Resource Context
+        # --------------------------------------------------------------
 
         self._registry = AtlasResourceRegistry()
         self._graph = AtlasResourceGraph(self._registry)
@@ -85,6 +111,119 @@ class AtlasProject:
         return self._metadata
 
     # ------------------------------------------------------------------
+    # Classification Registry
+    # ------------------------------------------------------------------
+
+    @property
+    def classifications(self) -> AtlasClassificationRegistry:
+        """
+        Return the Classification Registry owned by this Project.
+        """
+        return self._classifications
+
+    # ------------------------------------------------------------------
+    # Classification Hierarchy
+    # ------------------------------------------------------------------
+
+    @property
+    def classification_hierarchy(
+        self,
+    ) -> AtlasClassificationHierarchy:
+        """
+        Return the Classification Hierarchy owned by this Project.
+        """
+        return self._classification_hierarchy
+
+    # ------------------------------------------------------------------
+    # Classification Management
+    # ------------------------------------------------------------------
+
+    def add_classification(
+        self,
+        classification: AtlasClassification,
+    ) -> AtlasClassification:
+        """
+        Register a Classification with the Project.
+
+        Registration occurs in both the Classification Registry and
+        Classification Hierarchy.
+
+        For child classifications, the parent must already be
+        registered with the Project.
+
+        Raises
+        ------
+        ValueError
+            If the Classification is already registered or its parent
+            is not registered.
+        """
+
+        # Validate duplicate registration before mutating either
+        # project classification structure.
+        if self._classifications.contains(
+            classification.id
+        ):
+            raise ValueError(
+                "Classification already registered: "
+                f"{classification.id}"
+            )
+
+        # The hierarchy owns the parent/child integrity rule.
+        # Perform this before registry mutation so a failed hierarchy
+        # registration leaves the project unchanged.
+        self._classification_hierarchy.add(
+            classification
+        )
+
+        try:
+            self._classifications.register(
+                classification
+            )
+        except Exception:
+            # Keep both structures synchronized if the registry
+            # unexpectedly rejects the classification.
+            self._classification_hierarchy.remove(
+                classification.id
+            )
+            raise
+
+        return classification
+
+    def remove_classification(
+        self,
+        classification_id: str,
+    ) -> AtlasClassification | None:
+        """
+        Remove a Classification from the Project.
+
+        A Classification with registered children cannot be removed.
+
+        Returns
+        -------
+        AtlasClassification | None
+            The removed Classification, or None if it was not
+            registered.
+        """
+
+        classification = self._classifications.get(
+            classification_id
+        )
+
+        if classification is None:
+            return None
+
+        # The hierarchy performs the child-integrity check.
+        # If the classification has children, this raises ValueError
+        # and the registry remains unchanged.
+        self._classification_hierarchy.remove(
+            classification_id
+        )
+
+        return self._classifications.remove(
+            classification_id
+        )
+
+    # ------------------------------------------------------------------
     # Resource Registry
     # ------------------------------------------------------------------
 
@@ -96,7 +235,7 @@ class AtlasProject:
         return self._registry
 
     # ------------------------------------------------------------------
-    # Resource API
+    # Resource Management
     # ------------------------------------------------------------------
 
     def add_resource(
@@ -104,64 +243,18 @@ class AtlasProject:
         resource: AtlasResource,
     ) -> AtlasResource:
         """
-        Add a Resource to this Project.
-
-        Resource ownership remains with the Project's Resource Registry.
-
-        Returns the same Resource instance that was registered.
+        Register a Resource with the Project.
         """
-        self._registry.register(resource)
-
-        return resource
+        return self._registry.register(resource)
 
     def remove_resource(
         self,
-        resource: AtlasResource,
+        resource_id: str,
     ) -> AtlasResource | None:
         """
-        Remove a Resource from this Project.
-
-        Returns the removed Resource, or None if it is not registered.
+        Remove a Resource from the Project.
         """
-        return self._registry.unregister(resource.aid)
-
-    # ------------------------------------------------------------------
-    # Relationship API
-    # ------------------------------------------------------------------
-
-    def add_relationship(
-        self,
-        relationship: AtlasRelationship,
-    ) -> AtlasRelationship:
-        """
-        Add a Relationship to this Project.
-
-        Relationship ownership remains with the Project's Resource Graph.
-
-        Both endpoint Resources must belong to this Project.
-
-        Returns the same Relationship instance that was added.
-
-        Raises
-        ------
-        ValueError
-            If either endpoint Resource does not belong to this Project,
-            or if the Relationship already exists.
-        """
-        self._graph.add_relationship(relationship)
-
-        return relationship
-
-    def remove_relationship(
-        self,
-        relationship: AtlasRelationship,
-    ) -> AtlasRelationship | None:
-        """
-        Remove a Relationship from this Project.
-
-        Returns the removed Relationship, or None if it is not present.
-        """
-        return self._graph.remove_relationship(relationship)
+        return self._registry.unregister(resource_id)
 
     # ------------------------------------------------------------------
     # Resource Graph
@@ -175,6 +268,34 @@ class AtlasProject:
         return self._graph
 
     # ------------------------------------------------------------------
+    # Relationship Management
+    # ------------------------------------------------------------------
+
+    def add_relationship(
+        self,
+        relationship: AtlasRelationship,
+    ) -> AtlasRelationship:
+        """
+        Add a Relationship to the Project's Resource Graph.
+        """
+        self._graph.add_relationship(
+            relationship
+        )
+
+        return relationship
+
+    def remove_relationship(
+        self,
+        relationship: AtlasRelationship,
+    ) -> AtlasRelationship | None:
+        """
+        Remove a Relationship from the Project's Resource Graph.
+        """
+        return self._graph.remove_relationship(
+            relationship
+        )
+
+    # ------------------------------------------------------------------
     # Representation
     # ------------------------------------------------------------------
 
@@ -183,6 +304,7 @@ class AtlasProject:
             f"{self.__class__.__name__}("
             f"aid={self.aid}, "
             f"name='{self.name}', "
+            f"classifications={self.classifications.count}, "
             f"resources={self.resources.count}, "
             f"relationships={self.graph.count})"
         )
