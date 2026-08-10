@@ -13,6 +13,7 @@ from __future__ import annotations
 from atlas.core.aid import AtlasID
 from atlas.core.resource import AtlasResource
 from atlas.graph import AtlasResourceGraph
+from atlas.relationships.relationship import AtlasRelationship
 from atlas.resource_registry import AtlasResourceRegistry
 
 
@@ -107,20 +108,7 @@ class AtlasProject:
 
         Resource ownership remains with the Project's Resource Registry.
 
-        Parameters
-        ----------
-        resource:
-            Resource to register with the Project.
-
-        Returns
-        -------
-        AtlasResource
-            The same Resource instance that was registered.
-
-        Raises
-        ------
-        ValueError
-            If a Resource with the same identity is already registered.
+        Returns the same Resource instance that was registered.
         """
         self._registry.register(resource)
 
@@ -133,17 +121,47 @@ class AtlasProject:
         """
         Remove a Resource from this Project.
 
-        Parameters
-        ----------
-        resource:
-            Resource to remove.
-
-        Returns
-        -------
-        AtlasResource | None
-            The removed Resource, or None if it is not registered.
+        Returns the removed Resource, or None if it is not registered.
         """
         return self._registry.unregister(resource.aid)
+
+    # ------------------------------------------------------------------
+    # Relationship API
+    # ------------------------------------------------------------------
+
+    def add_relationship(
+        self,
+        relationship: AtlasRelationship,
+    ) -> AtlasRelationship:
+        """
+        Add a Relationship to this Project.
+
+        Relationship ownership remains with the Project's Resource Graph.
+
+        Both endpoint Resources must belong to this Project.
+
+        Returns the same Relationship instance that was added.
+
+        Raises
+        ------
+        ValueError
+            If either endpoint Resource does not belong to this Project,
+            or if the Relationship already exists.
+        """
+        self._graph.add_relationship(relationship)
+
+        return relationship
+
+    def remove_relationship(
+        self,
+        relationship: AtlasRelationship,
+    ) -> AtlasRelationship | None:
+        """
+        Remove a Relationship from this Project.
+
+        Returns the removed Relationship, or None if it is not present.
+        """
+        return self._graph.remove_relationship(relationship)
 
     # ------------------------------------------------------------------
     # Resource Graph
