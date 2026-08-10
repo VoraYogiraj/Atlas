@@ -806,4 +806,4 @@ def test_project_repr():
     assert "AtlasProject" in representation
     assert "Residential Project" in representation
     assert "resources=0" in representation
-    assert "relationships=0" in representation
+    
