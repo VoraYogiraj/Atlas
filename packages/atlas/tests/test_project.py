@@ -18,6 +18,26 @@ def create_resource(name: str) -> AtlasResource:
     )
 
 
+def add_project_resource(
+    project: AtlasProject,
+    resource: AtlasResource,
+) -> AtlasResource:
+    """
+    Register a Resource's Classification with the Project when needed,
+    then add the Resource through the Project API.
+
+    This keeps the older project tests compatible with the new
+    project-scoped classification integrity contract.
+    """
+    classification_id = resource.classification.id
+
+    if not project.classifications.contains(classification_id):
+        project.add_classification(resource.classification)
+
+    return add_project_resource(project, resource)
+
+
+
 # ----------------------------------------------------------------------
 # Project Identity
 # ----------------------------------------------------------------------
@@ -329,7 +349,7 @@ def test_project_add_resource_registers_resource():
         "North Wall"
     )
 
-    project.add_resource(wall)
+    add_project_resource(project, wall)
 
     assert project.resources.contains(
         wall.aid
@@ -347,8 +367,9 @@ def test_project_add_resource_returns_resource():
         "North Wall"
     )
 
-    result = project.add_resource(
-        wall
+    result = add_project_resource(
+        project,
+        wall,
     )
 
     assert result is wall
@@ -363,8 +384,9 @@ def test_project_remove_resource_removes_resource():
         "North Wall"
     )
 
-    project.add_resource(
-        wall
+    add_project_resource(
+        project,
+        wall,
     )
 
     removed = project.remove_resource(
@@ -403,8 +425,9 @@ def test_project_add_resource_rejects_duplicate_resource():
         "North Wall"
     )
 
-    project.add_resource(
-        wall
+    add_project_resource(
+        project,
+        wall,
     )
 
     try:
@@ -429,8 +452,9 @@ def test_project_resources_remain_owned_by_registry():
         "North Wall"
     )
 
-    result = project.add_resource(
-        wall
+    result = add_project_resource(
+        project,
+        wall,
     )
 
     assert result is wall
@@ -458,8 +482,8 @@ def test_project_add_relationship_adds_to_graph():
         "Living Room"
     )
 
-    project.add_resource(wall)
-    project.add_resource(room)
+    add_project_resource(project, wall)
+    add_project_resource(project, room)
 
     relationship = AtlasRelationship(
         id="wall-room-relationship",
@@ -492,8 +516,8 @@ def test_project_add_relationship_returns_relationship():
         "Living Room"
     )
 
-    project.add_resource(wall)
-    project.add_resource(room)
+    add_project_resource(project, wall)
+    add_project_resource(project, room)
 
     relationship = AtlasRelationship(
         id="wall-room-relationship",
@@ -522,8 +546,8 @@ def test_project_add_relationship_rejects_duplicate():
         "Living Room"
     )
 
-    project.add_resource(wall)
-    project.add_resource(room)
+    add_project_resource(project, wall)
+    add_project_resource(project, room)
 
     relationship = AtlasRelationship(
         id="wall-room-relationship",
@@ -642,8 +666,8 @@ def test_project_remove_relationship_removes_from_graph():
         "Living Room"
     )
 
-    project.add_resource(wall)
-    project.add_resource(room)
+    add_project_resource(project, wall)
+    add_project_resource(project, room)
 
     relationship = AtlasRelationship(
         id="wall-room-relationship",
@@ -682,8 +706,8 @@ def test_project_remove_missing_relationship_returns_none():
         "Living Room"
     )
 
-    project.add_resource(wall)
-    project.add_resource(room)
+    add_project_resource(project, wall)
+    add_project_resource(project, room)
 
     relationship = AtlasRelationship(
         id="missing-relationship",
@@ -710,8 +734,8 @@ def test_project_relationship_does_not_change_resource_count():
         "Living Room"
     )
 
-    project.add_resource(wall)
-    project.add_resource(room)
+    add_project_resource(project, wall)
+    add_project_resource(project, room)
 
     relationship = AtlasRelationship(
         id="wall-room-relationship",
@@ -746,8 +770,8 @@ def test_project_relationship_preserves_resource_ownership():
         "Living Room"
     )
 
-    project.add_resource(wall)
-    project.add_resource(room)
+    add_project_resource(project, wall)
+    add_project_resource(project, room)
 
     relationship = AtlasRelationship(
         id="wall-room-relationship",
