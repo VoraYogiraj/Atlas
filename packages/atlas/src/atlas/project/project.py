@@ -5,7 +5,7 @@ Defines the top-level project context that owns Atlas Resources,
 Relationships, Classifications, and Classification Hierarchy.
 
 Specification:
-ENG-009 / ENG-011 / ENG-019
+ENG-009 / ENG-011 / ENG-019 / ENG-020
 """
 
 from __future__ import annotations
@@ -43,8 +43,7 @@ class AtlasProject:
 
     The Resource Graph manages Relationships between Resources.
 
-    The project acts as the integration boundary between these
-    subsystems.
+    The Project is the integration boundary between these systems.
     """
 
     def __init__(
@@ -64,6 +63,7 @@ class AtlasProject:
         # --------------------------------------------------------------
 
         self._classifications = AtlasClassificationRegistry()
+
         self._classification_hierarchy = (
             AtlasClassificationHierarchy()
         )
@@ -73,7 +73,10 @@ class AtlasProject:
         # --------------------------------------------------------------
 
         self._registry = AtlasResourceRegistry()
-        self._graph = AtlasResourceGraph(self._registry)
+
+        self._graph = AtlasResourceGraph(
+            self._registry
+        )
 
     # ------------------------------------------------------------------
     # Identity
@@ -97,7 +100,9 @@ class AtlasProject:
     def name(self, value: str) -> None:
         """Set the Project name."""
         if not value.strip():
-            raise ValueError("Project name cannot be empty")
+            raise ValueError(
+                "Project name cannot be empty"
+            )
 
         self._name = value
 
@@ -115,7 +120,9 @@ class AtlasProject:
     # ------------------------------------------------------------------
 
     @property
-    def classifications(self) -> AtlasClassificationRegistry:
+    def classifications(
+        self,
+    ) -> AtlasClassificationRegistry:
         """
         Return the Classification Registry owned by this Project.
         """
@@ -145,11 +152,16 @@ class AtlasProject:
         """
         Register a Classification with the Project.
 
-        Registration occurs in both the Classification Registry and
-        Classification Hierarchy.
+        The Classification is registered in both the Registry
+        and the Hierarchy.
 
-        Child classifications require their parent to already be
-        registered with the Project.
+        Child classifications require their parent to already
+        belong to the Project.
+
+        Returns
+        -------
+        AtlasClassification
+            The registered Classification.
 
         Raises
         ------
@@ -168,10 +180,7 @@ class AtlasProject:
                 f"{classification.id}"
             )
 
-        # Validate and register in the hierarchy first.
-        #
-        # This ensures that a child can only be introduced when
-        # its parent already belongs to this Project.
+        # The hierarchy validates parent registration.
         self._classification_hierarchy.add(
             classification
         )
@@ -181,8 +190,8 @@ class AtlasProject:
                 classification
             )
         except Exception:
-            # Keep the hierarchy and registry synchronized if the
-            # registry unexpectedly rejects the classification.
+            # Roll back hierarchy registration if registry
+            # registration unexpectedly fails.
             self._classification_hierarchy.remove(
                 classification.id
             )
@@ -197,13 +206,23 @@ class AtlasProject:
         """
         Remove a Classification from the Project.
 
-        A Classification with registered children cannot be removed.
+        A Classification cannot be removed if:
+
+            - It has registered child classifications.
+            - It is referenced by a registered Resource.
 
         Returns
         -------
         AtlasClassification | None
-            The removed Classification, or None if it was not
-            registered.
+            The removed Classification, or None if it does not exist.
+
+        Raises
+        ------
+        ValueError
+            If the Classification has registered children.
+
+        ValueError
+            If the Classification is used by a Resource.
         """
 
         classification = self._classifications.get(
@@ -213,11 +232,32 @@ class AtlasProject:
         if classification is None:
             return None
 
-        # The hierarchy enforces the child-integrity rule.
+        # --------------------------------------------------------------
+        # Resource dependency integrity
+        # --------------------------------------------------------------
+
+        for resource in self._registry:
+            if (
+                resource.classification.id
+                == classification_id
+            ):
+                raise ValueError(
+                    "Classification is used by a "
+                    "registered Resource: "
+                    f"{classification_id}"
+                )
+
+        # --------------------------------------------------------------
+        # Hierarchy integrity
+        # --------------------------------------------------------------
+
+        # This may raise ValueError if the classification
+        # still has registered children.
         self._classification_hierarchy.remove(
             classification_id
         )
 
+        # Only mutate the registry after all validation succeeds.
         return self._classifications.remove(
             classification_id
         )
@@ -244,9 +284,38 @@ class AtlasProject:
         """
         Register a Resource with the Project.
 
-        Returns the Resource that was registered.
+        The Resource's Classification must already be registered
+        with this Project.
+
+        Classification identity is determined by classification ID,
+        not Python object identity.
+
+        Returns
+        -------
+        AtlasResource
+            The registered Resource.
+
+        Raises
+        ------
+        ValueError
+            If the Resource's Classification is not registered
+            with this Project.
         """
-        self._registry.register(resource)
+
+        classification_id = resource.classification.id
+
+        if not self._classifications.contains(
+            classification_id
+        ):
+            raise ValueError(
+                "Resource classification is not "
+                "registered with this Project: "
+                f"{classification_id}"
+            )
+
+        self._registry.register(
+            resource
+        )
 
         return resource
 
@@ -257,12 +326,20 @@ class AtlasProject:
         """
         Remove a Resource from the Project.
 
-        Returns the removed Resource, or None if it was not registered.
+        Returns
+        -------
+        AtlasResource | None
+            The removed Resource, or None if it is not registered.
         """
-        if not self._registry.contains(resource.aid):
+
+        if not self._registry.contains(
+            resource.aid
+        ):
             return None
 
-        self._registry.unregister(resource.aid)
+        self._registry.unregister(
+            resource.aid
+        )
 
         return resource
 
@@ -290,6 +367,7 @@ class AtlasProject:
 
         Returns the Relationship that was added.
         """
+
         self._graph.add_relationship(
             relationship
         )
@@ -303,6 +381,7 @@ class AtlasProject:
         """
         Remove a Relationship from the Project's Resource Graph.
         """
+
         return self._graph.remove_relationship(
             relationship
         )
@@ -316,7 +395,10 @@ class AtlasProject:
             f"{self.__class__.__name__}("
             f"aid={self.aid}, "
             f"name='{self.name}', "
-            f"classifications={self.classifications.count}, "
-            f"resources={self.resources.count}, "
-            f"relationships={self.graph.count})"
+            f"classifications="
+            f"{self.classifications.count}, "
+            f"resources="
+            f"{self.resources.count}, "
+            f"relationships="
+            f"{self.graph.count})"
         )
