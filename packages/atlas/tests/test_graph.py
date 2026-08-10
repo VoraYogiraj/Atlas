@@ -25,7 +25,9 @@ def make_relationship(
     relationship_id: str | None = None,
 ) -> AtlasRelationship:
     if relationship_id is None:
-        relationship_id = f"{source.aid}-{target.aid}-{relationship_type}"
+        relationship_id = (
+            f"{source.aid}-{target.aid}-{relationship_type}"
+        )
 
     return AtlasRelationship(
         id=relationship_id,
@@ -1228,3 +1230,652 @@ def test_connected_does_not_modify_graph() -> None:
 
     assert list(graph) == before
     assert graph.count == 1
+
+
+# ===========================================================================
+# ENG-014 — Graph Traversal
+# ===========================================================================
+
+
+def test_traverse_returns_starting_resource() -> None:
+    registry = AtlasResourceRegistry()
+
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    assert graph.traverse(building) == [
+        building,
+    ]
+
+
+def test_traverse_follows_linear_graph() -> None:
+    registry = AtlasResourceRegistry()
+
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
+
+    room = make_resource(
+        registry,
+        "Room",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(
+        make_relationship(
+            building,
+            floor,
+            "contains",
+            "relationship-1",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            floor,
+            room,
+            "contains",
+            "relationship-2",
+        )
+    )
+
+    assert graph.traverse(building) == [
+        building,
+        floor,
+        room,
+    ]
+
+
+def test_traverse_follows_branching_graph() -> None:
+    registry = AtlasResourceRegistry()
+
+    building = make_resource(
+        registry,
+        "Building",
+    )
+
+    floor = make_resource(
+        registry,
+        "Floor",
+    )
+
+    room = make_resource(
+        registry,
+        "Room",
+    )
+
+    door = make_resource(
+        registry,
+        "Door",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(
+        make_relationship(
+            building,
+            floor,
+            "contains",
+            "relationship-1",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            floor,
+            room,
+            "contains",
+            "relationship-2",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            floor,
+            door,
+            "contains",
+            "relationship-3",
+        )
+    )
+
+    assert graph.traverse(floor) == [
+        floor,
+        room,
+        door,
+        building,
+    ]
+
+
+def test_traverse_handles_cycles() -> None:
+    registry = AtlasResourceRegistry()
+
+    first = make_resource(
+        registry,
+        "First",
+    )
+
+    second = make_resource(
+        registry,
+        "Second",
+    )
+
+    third = make_resource(
+        registry,
+        "Third",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(
+        make_relationship(
+            first,
+            second,
+            "connects",
+            "relationship-1",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            second,
+            third,
+            "connects",
+            "relationship-2",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            third,
+            first,
+            "connects",
+            "relationship-3",
+        )
+    )
+
+    assert graph.traverse(first) == [
+        first,
+        second,
+        third,
+    ]
+
+
+def test_traverse_does_not_duplicate_resources() -> None:
+    registry = AtlasResourceRegistry()
+
+    first = make_resource(
+        registry,
+        "First",
+    )
+
+    second = make_resource(
+        registry,
+        "Second",
+    )
+
+    third = make_resource(
+        registry,
+        "Third",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(
+        make_relationship(
+            first,
+            second,
+            "connects",
+            "relationship-1",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            first,
+            third,
+            "connects",
+            "relationship-2",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            second,
+            third,
+            "connects",
+            "relationship-3",
+        )
+    )
+
+    result = graph.traverse(first)
+
+    assert result == [
+        first,
+        second,
+        third,
+    ]
+
+    assert len(result) == len(set(result))
+
+
+def test_traverse_max_depth_zero_returns_start() -> None:
+    registry = AtlasResourceRegistry()
+
+    first = make_resource(
+        registry,
+        "First",
+    )
+
+    second = make_resource(
+        registry,
+        "Second",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(
+        make_relationship(
+            first,
+            second,
+        )
+    )
+
+    assert graph.traverse(
+        first,
+        max_depth=0,
+    ) == [
+        first,
+    ]
+
+
+def test_traverse_max_depth_one_returns_direct_neighbors() -> None:
+    registry = AtlasResourceRegistry()
+
+    first = make_resource(
+        registry,
+        "First",
+    )
+
+    second = make_resource(
+        registry,
+        "Second",
+    )
+
+    third = make_resource(
+        registry,
+        "Third",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(
+        make_relationship(
+            first,
+            second,
+            "connects",
+            "relationship-1",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            second,
+            third,
+            "connects",
+            "relationship-2",
+        )
+    )
+
+    assert graph.traverse(
+        first,
+        max_depth=1,
+    ) == [
+        first,
+        second,
+    ]
+
+
+def test_traverse_max_depth_two_follows_two_hops() -> None:
+    registry = AtlasResourceRegistry()
+
+    first = make_resource(
+        registry,
+        "First",
+    )
+
+    second = make_resource(
+        registry,
+        "Second",
+    )
+
+    third = make_resource(
+        registry,
+        "Third",
+    )
+
+    fourth = make_resource(
+        registry,
+        "Fourth",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(
+        make_relationship(
+            first,
+            second,
+            "connects",
+            "relationship-1",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            second,
+            third,
+            "connects",
+            "relationship-2",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            third,
+            fourth,
+            "connects",
+            "relationship-3",
+        )
+    )
+
+    assert graph.traverse(
+        first,
+        max_depth=2,
+    ) == [
+        first,
+        second,
+        third,
+    ]
+
+
+def test_traverse_rejects_negative_depth() -> None:
+    registry = AtlasResourceRegistry()
+
+    resource = make_resource(
+        registry,
+        "Resource",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    try:
+        graph.traverse(
+            resource,
+            max_depth=-1,
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Negative max_depth should raise ValueError"
+        )
+
+
+def test_traverse_rejects_unregistered_resource() -> None:
+    registry = AtlasResourceRegistry()
+
+    resource = AtlasResource(
+        name="Foreign",
+        classification="building",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    try:
+        graph.traverse(resource)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Unregistered resource should raise ValueError"
+        )
+
+
+def test_reachable_returns_true_for_direct_connection() -> None:
+    registry = AtlasResourceRegistry()
+
+    first = make_resource(
+        registry,
+        "First",
+    )
+
+    second = make_resource(
+        registry,
+        "Second",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(
+        make_relationship(
+            first,
+            second,
+        )
+    )
+
+    assert graph.reachable(
+        first,
+        second,
+    ) is True
+
+
+def test_reachable_returns_true_for_multi_hop_connection() -> None:
+    registry = AtlasResourceRegistry()
+
+    first = make_resource(
+        registry,
+        "First",
+    )
+
+    second = make_resource(
+        registry,
+        "Second",
+    )
+
+    third = make_resource(
+        registry,
+        "Third",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(
+        make_relationship(
+            first,
+            second,
+            "connects",
+            "relationship-1",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            second,
+            third,
+            "connects",
+            "relationship-2",
+        )
+    )
+
+    assert graph.reachable(
+        first,
+        third,
+    ) is True
+
+
+def test_reachable_returns_false_for_unreachable_resource() -> None:
+    registry = AtlasResourceRegistry()
+
+    first = make_resource(
+        registry,
+        "First",
+    )
+
+    second = make_resource(
+        registry,
+        "Second",
+    )
+
+    third = make_resource(
+        registry,
+        "Third",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(
+        make_relationship(
+            first,
+            second,
+        )
+    )
+
+    assert graph.reachable(
+        first,
+        third,
+    ) is False
+
+
+def test_resource_is_reachable_from_itself() -> None:
+    registry = AtlasResourceRegistry()
+
+    resource = make_resource(
+        registry,
+        "Resource",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    assert graph.reachable(
+        resource,
+        resource,
+    ) is True
+
+
+def test_reachable_handles_cycles() -> None:
+    registry = AtlasResourceRegistry()
+
+    first = make_resource(
+        registry,
+        "First",
+    )
+
+    second = make_resource(
+        registry,
+        "Second",
+    )
+
+    third = make_resource(
+        registry,
+        "Third",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    graph.add_relationship(
+        make_relationship(
+            first,
+            second,
+            "connects",
+            "relationship-1",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            second,
+            third,
+            "connects",
+            "relationship-2",
+        )
+    )
+
+    graph.add_relationship(
+        make_relationship(
+            third,
+            first,
+            "connects",
+            "relationship-3",
+        )
+    )
+
+    assert graph.reachable(
+        first,
+        third,
+    ) is True
+
+
+def test_reachable_rejects_foreign_source() -> None:
+    registry = AtlasResourceRegistry()
+
+    registered = make_resource(
+        registry,
+        "Registered",
+    )
+
+    foreign = AtlasResource(
+        name="Foreign",
+        classification="building",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    try:
+        graph.reachable(
+            foreign,
+            registered,
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Foreign source should raise ValueError"
+        )
+
+
+def test_reachable_rejects_foreign_target() -> None:
+    registry = AtlasResourceRegistry()
+
+    registered = make_resource(
+        registry,
+        "Registered",
+    )
+
+    foreign = AtlasResource(
+        name="Foreign",
+        classification="building",
+    )
+
+    graph = AtlasResourceGraph(registry)
+
+    try:
+        graph.reachable(
+            registered,
+            foreign,
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Foreign target should raise ValueError"
+        )
