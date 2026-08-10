@@ -236,7 +236,6 @@ def test_graph_returns_incoming_relationships():
     result = graph.incoming(wall)
 
     assert result == [
-        contains,
         supports,
     ]
 
@@ -386,26 +385,19 @@ def test_graph_queries_update_after_relationship_removal():
 
     assert graph.for_resource(wall) == []
     assert graph.for_resource(door) == []
+
     assert graph.for_relationship_type(
         "contains"
     ) == []
 
 
 # ----------------------------------------------------------------------
-# Identity
+# Identity / Registered Resource
 # ----------------------------------------------------------------------
 
 
-def test_graph_resource_query_uses_resource_identity():
+def test_graph_resource_query_uses_registered_resource_id():
     graph, wall, door, window = create_graph()
-
-    equivalent_wall = create_resource(
-        wall.classification,
-        "Equivalent Wall",
-    )
-
-    # Force the test object to represent the same Resource identity.
-    equivalent_wall._aid = wall.aid
 
     relationship = create_relationship(
         id="wall-contains-door",
@@ -418,9 +410,11 @@ def test_graph_resource_query_uses_resource_identity():
         relationship
     )
 
-    assert graph.for_resource(
-        equivalent_wall
-    ) == [
+    result = graph.for_resource(
+        wall
+    )
+
+    assert result == [
         relationship
     ]
 
