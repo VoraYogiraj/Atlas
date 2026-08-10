@@ -4,13 +4,15 @@ Atlas Resource Graph
 Provides project-level relationship management between Atlas Resources.
 
 Specification:
-    ENG-011 — Resource Graph
-    ENG-012 — Project Graph Integrity
-    ENG-013 — Graph Queries
+ENG-011 — Resource Graph
+ENG-012 — Project Graph Integrity
+ENG-013 — Graph Queries
+ENG-014 — Graph Traversal
 """
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Iterator
 
 from atlas.core.resource import AtlasResource
@@ -264,6 +266,141 @@ class AtlasResourceGraph:
                 second,
             )
         )
+
+    # ------------------------------------------------------------------
+    # Graph Traversal
+    # ------------------------------------------------------------------
+
+    def traverse(
+        self,
+        resource: AtlasResource,
+        max_depth: int | None = None,
+    ) -> list[AtlasResource]:
+        """
+        Traverse the graph from a starting Resource using breadth-first
+        search.
+
+        The starting Resource is always included in the result.
+
+        Traversal is direction-independent: Relationships are treated
+        as connections between Resources regardless of their declared
+        source/target direction.
+
+        Parameters
+        ----------
+        resource:
+            Resource from which traversal begins.
+
+        max_depth:
+            Maximum number of relationship hops to traverse.
+
+            None
+                Traverse until all reachable Resources are visited.
+
+            0
+                Return only the starting Resource.
+
+            1
+                Return the starting Resource and its direct neighbors.
+
+            2
+                Continue through Resources two relationships away.
+
+        Returns
+        -------
+        list[AtlasResource]
+            Resources in deterministic breadth-first discovery order.
+
+        Raises
+        ------
+        ValueError
+            If the starting Resource does not belong to this graph.
+
+            If max_depth is negative.
+        """
+        self._validate_resource(resource)
+
+        if max_depth is not None and max_depth < 0:
+            raise ValueError(
+                "max_depth must be greater than or equal to 0"
+            )
+
+        result: list[AtlasResource] = []
+
+        visited = {resource.aid}
+
+        queue: deque[tuple[AtlasResource, int]] = deque(
+            [(resource, 0)]
+        )
+
+        while queue:
+            current, depth = queue.popleft()
+
+            result.append(current)
+
+            if (
+                max_depth is not None
+                and depth >= max_depth
+            ):
+                continue
+
+            for neighbor in self.neighbors(current):
+                if neighbor.aid in visited:
+                    continue
+
+                visited.add(neighbor.aid)
+
+                queue.append(
+                    (
+                        neighbor,
+                        depth + 1,
+                    )
+                )
+
+        return result
+
+    def reachable(
+        self,
+        source: AtlasResource,
+        target: AtlasResource,
+    ) -> bool:
+        """
+        Return True if target is reachable from source through one or
+        more graph relationships.
+
+        Traversal is direction-independent and supports multi-hop paths.
+
+        A Resource is always reachable from itself.
+
+        Raises
+        ------
+        ValueError
+            If either Resource does not belong to this graph.
+        """
+        self._validate_resource(source)
+        self._validate_resource(target)
+
+        if source.aid == target.aid:
+            return True
+
+        visited = {source.aid}
+
+        queue: deque[AtlasResource] = deque([source])
+
+        while queue:
+            current = queue.popleft()
+
+            for neighbor in self.neighbors(current):
+                if neighbor.aid in visited:
+                    continue
+
+                if neighbor.aid == target.aid:
+                    return True
+
+                visited.add(neighbor.aid)
+                queue.append(neighbor)
+
+        return False
 
     # ------------------------------------------------------------------
     # Removal
