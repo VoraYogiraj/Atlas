@@ -17,13 +17,15 @@ from atlas.classification.classification import AtlasClassification
 
 class AtlasClassificationHierarchy:
     """
-    Collection of Atlas Classifications.
+    Collection and integrity manager for Atlas Classifications.
 
-    The hierarchy owns classification registrations, while the
-    AtlasClassification objects themselves remain immutable.
+    The hierarchy owns classification registrations.
 
-    Classification ancestry is defined by each classification's
-    ``parent`` relationship.
+    AtlasClassification objects remain immutable and define their own
+    parent relationship.
+
+    The hierarchy is responsible for ensuring that registered
+    classifications form a coherent parent/child structure.
     """
 
     def __init__(self) -> None:
@@ -43,17 +45,34 @@ class AtlasClassificationHierarchy:
         """
         Add a Classification to the hierarchy.
 
-        Classification IDs must be unique.
+        Root classifications may be added without a parent.
+
+        Child classifications require their direct parent to already
+        be registered.
 
         Raises
         ------
         ValueError
-            If a Classification with the same ID already exists.
+            If the classification ID already exists.
+
+        ValueError
+            If the classification has a parent that is not registered.
         """
         if classification.id in self._classifications:
             raise ValueError(
                 "Classification already exists in hierarchy: "
                 f"{classification.id}"
+            )
+
+        parent = classification.parent
+
+        if (
+            parent is not None
+            and parent.id not in self._classifications
+        ):
+            raise ValueError(
+                "Classification parent is not registered: "
+                f"{parent.id}"
             )
 
         self._classifications[
@@ -99,11 +118,35 @@ class AtlasClassificationHierarchy:
         """
         Remove and return a Classification.
 
+        A Classification cannot be removed while another registered
+        Classification declares it as its parent.
+
         Returns None if the Classification is not registered.
+
+        Raises
+        ------
+        ValueError
+            If the Classification has registered children.
         """
+        classification = self._classifications.get(
+            classification_id
+        )
+
+        if classification is None:
+            return None
+
+        for registered in self._classifications.values():
+            if registered.parent is None:
+                continue
+
+            if registered.parent.id == classification_id:
+                raise ValueError(
+                    "Cannot remove classification with "
+                    f"registered children: {classification_id}"
+                )
+
         return self._classifications.pop(
-            classification_id,
-            None,
+            classification_id
         )
 
     # ------------------------------------------------------------------
