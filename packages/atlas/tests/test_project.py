@@ -316,6 +316,131 @@ def test_project_graph_rejects_relationship_between_foreign_resources():
 
 
 # ----------------------------------------------------------------------
+# Project Resource API
+# ----------------------------------------------------------------------
+
+
+def test_project_add_resource_registers_resource():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    project.add_resource(wall)
+
+    assert project.resources.contains(
+        wall.aid
+    )
+
+    assert project.resources.count == 1
+
+
+def test_project_add_resource_returns_resource():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    result = project.add_resource(
+        wall
+    )
+
+    assert result is wall
+
+
+def test_project_remove_resource_removes_resource():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    project.add_resource(
+        wall
+    )
+
+    removed = project.remove_resource(
+        wall
+    )
+
+    assert removed is wall
+
+    assert not project.resources.contains(
+        wall.aid
+    )
+
+    assert project.resources.count == 0
+
+
+def test_project_remove_missing_resource_returns_none():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    assert project.remove_resource(
+        wall
+    ) is None
+
+
+def test_project_add_resource_rejects_duplicate_resource():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    project.add_resource(
+        wall
+    )
+
+    try:
+        project.add_resource(
+            wall
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Expected duplicate Resource registration "
+            "to raise ValueError"
+        )
+
+
+def test_project_resources_remain_owned_by_registry():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource(
+        "North Wall"
+    )
+
+    result = project.add_resource(
+        wall
+    )
+
+    assert result is wall
+
+    assert project.resources.get(
+        wall.aid
+    ) is wall
+
+
+# ----------------------------------------------------------------------
 # Representation
 # ----------------------------------------------------------------------
 
