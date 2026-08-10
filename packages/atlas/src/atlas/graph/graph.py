@@ -102,14 +102,18 @@ class AtlasResourceGraph:
             If either endpoint is not registered or the relationship
             already exists.
         """
-        self._validate_relationship(relationship)
+        self._validate_relationship(
+            relationship
+        )
 
         if relationship in self._relationships:
             raise ValueError(
                 "Relationship already exists in graph"
             )
 
-        self._relationships.append(relationship)
+        self._relationships.append(
+            relationship
+        )
 
     # ------------------------------------------------------------------
     # Relationship Lookup
@@ -165,8 +169,12 @@ class AtlasResourceGraph:
         Return all Relationships involving a Resource.
 
         The Resource must belong to this graph.
+
+        Relationship direction is ignored.
         """
-        self._validate_resource(resource)
+        self._validate_resource(
+            resource
+        )
 
         resource_id = resource.aid
 
@@ -177,6 +185,96 @@ class AtlasResourceGraph:
                 relationship.source.aid == resource_id
                 or relationship.target.aid == resource_id
             )
+        ]
+
+    # ------------------------------------------------------------------
+    # ENG-022 — Relationship Queries
+    # ------------------------------------------------------------------
+
+    def outgoing(
+        self,
+        resource: AtlasResource,
+    ) -> list[AtlasRelationship]:
+        """
+        Return Relationships originating from a Resource.
+
+        Only the source endpoint is considered.
+
+        Relationships where the Resource is only the target are
+        excluded.
+
+        Registration order is preserved.
+        """
+        self._validate_resource(
+            resource
+        )
+
+        resource_id = resource.aid
+
+        return [
+            relationship
+            for relationship in self._relationships
+            if relationship.source.aid == resource_id
+        ]
+
+    def incoming(
+        self,
+        resource: AtlasResource,
+    ) -> list[AtlasRelationship]:
+        """
+        Return Relationships terminating at a Resource.
+
+        Only the target endpoint is considered.
+
+        Relationships where the Resource is only the source are
+        excluded.
+
+        Registration order is preserved.
+        """
+        self._validate_resource(
+            resource
+        )
+
+        resource_id = resource.aid
+
+        return [
+            relationship
+            for relationship in self._relationships
+            if relationship.target.aid == resource_id
+        ]
+
+    def for_relationship_type(
+        self,
+        relationship_type: str,
+    ) -> list[AtlasRelationship]:
+        """
+        Return all Relationships having a specific relationship type.
+
+        Registration order is preserved.
+
+        Raises
+        ------
+        ValueError
+            If relationship_type is empty or whitespace.
+        """
+        if not isinstance(
+            relationship_type,
+            str,
+        ):
+            raise TypeError(
+                "relationship_type must be a string"
+            )
+
+        if not relationship_type.strip():
+            raise ValueError(
+                "relationship_type cannot be empty"
+            )
+
+        return [
+            relationship
+            for relationship in self._relationships
+            if relationship.relationship_type
+            == relationship_type
         ]
 
     # ------------------------------------------------------------------
@@ -194,26 +292,29 @@ class AtlasResourceGraph:
 
         The returned Resources are resolved through the graph's
         Resource Registry.
-
-        Raises
-        ------
-        ValueError
-            If the Resource does not belong to this graph.
         """
-        self._validate_resource(resource)
+        self._validate_resource(
+            resource
+        )
 
         resource_id = resource.aid
-        neighbor_ids = []
+        neighbor_ids: list = []
 
         for relationship in self._relationships:
             if relationship.source.aid == resource_id:
-                neighbor_ids.append(relationship.target.aid)
+                neighbor_ids.append(
+                    relationship.target.aid
+                )
 
             elif relationship.target.aid == resource_id:
-                neighbor_ids.append(relationship.source.aid)
+                neighbor_ids.append(
+                    relationship.source.aid
+                )
 
         return [
-            self._resources.require(neighbor_id)
+            self._resources.require(
+                neighbor_id
+            )
             for neighbor_id in neighbor_ids
         ]
 
@@ -232,7 +333,9 @@ class AtlasResourceGraph:
         ValueError
             If the Resource does not belong to this graph.
         """
-        self._validate_resource(resource)
+        self._validate_resource(
+            resource
+        )
 
         resource_id = resource.aid
 
@@ -244,7 +347,8 @@ class AtlasResourceGraph:
                     relationship.source.aid == resource_id
                     or relationship.target.aid == resource_id
                 )
-                and relationship.relationship_type == relationship_type
+                and relationship.relationship_type
+                == relationship_type
             )
         ]
 
@@ -287,7 +391,9 @@ class AtlasResourceGraph:
 
         Duplicate Resources are removed while preserving order.
         """
-        self._validate_resource(resource)
+        self._validate_resource(
+            resource
+        )
 
         resource_id = resource.aid
 
@@ -314,7 +420,9 @@ class AtlasResourceGraph:
         ]
 
         return [
-            self._resources.require(neighbor_id)
+            self._resources.require(
+                neighbor_id
+            )
             for neighbor_id in neighbor_ids
         ]
 
@@ -363,25 +471,41 @@ class AtlasResourceGraph:
 
             If max_depth is negative.
         """
-        self._validate_resource(resource)
+        self._validate_resource(
+            resource
+        )
 
-        if max_depth is not None and max_depth < 0:
+        if (
+            max_depth is not None
+            and max_depth < 0
+        ):
             raise ValueError(
                 "max_depth must be greater than or equal to 0"
             )
 
         result: list[AtlasResource] = []
 
-        visited = {resource.aid}
+        visited = {
+            resource.aid
+        }
 
-        queue: deque[tuple[AtlasResource, int]] = deque(
-            [(resource, 0)]
+        queue: deque[
+            tuple[AtlasResource, int]
+        ] = deque(
+            [
+                (
+                    resource,
+                    0,
+                )
+            ]
         )
 
         while queue:
             current, depth = queue.popleft()
 
-            result.append(current)
+            result.append(
+                current
+            )
 
             if (
                 max_depth is not None
@@ -389,11 +513,15 @@ class AtlasResourceGraph:
             ):
                 continue
 
-            for neighbor in self._traversal_neighbors(current):
+            for neighbor in self._traversal_neighbors(
+                current
+            ):
                 if neighbor.aid in visited:
                     continue
 
-                visited.add(neighbor.aid)
+                visited.add(
+                    neighbor.aid
+                )
 
                 queue.append(
                     (
@@ -421,30 +549,46 @@ class AtlasResourceGraph:
         ValueError
             If either Resource does not belong to this graph.
         """
-        self._validate_resource(source)
-        self._validate_resource(target)
+        self._validate_resource(
+            source
+        )
+
+        self._validate_resource(
+            target
+        )
 
         if source.aid == target.aid:
             return True
 
-        visited = {source.aid}
+        visited = {
+            source.aid
+        }
 
         queue: deque[AtlasResource] = deque(
-            [source]
+            [
+                source
+            ]
         )
 
         while queue:
             current = queue.popleft()
 
-            for neighbor in self._traversal_neighbors(current):
+            for neighbor in self._traversal_neighbors(
+                current
+            ):
                 if neighbor.aid in visited:
                     continue
 
                 if neighbor.aid == target.aid:
                     return True
 
-                visited.add(neighbor.aid)
-                queue.append(neighbor)
+                visited.add(
+                    neighbor.aid
+                )
+
+                queue.append(
+                    neighbor
+                )
 
         return False
 
@@ -464,7 +608,9 @@ class AtlasResourceGraph:
         if relationship not in self._relationships:
             return None
 
-        self._relationships.remove(relationship)
+        self._relationships.remove(
+            relationship
+        )
 
         return relationship
 
@@ -477,19 +623,27 @@ class AtlasResourceGraph:
         """
         Return the number of Relationships in the graph.
         """
-        return len(self._relationships)
+        return len(
+            self._relationships
+        )
 
     def __len__(self) -> int:
         """
         Return the number of Relationships in the graph.
         """
-        return len(self._relationships)
+        return len(
+            self._relationships
+        )
 
-    def __iter__(self) -> Iterator[AtlasRelationship]:
+    def __iter__(
+        self,
+    ) -> Iterator[AtlasRelationship]:
         """
         Iterate over Relationships.
         """
-        return iter(self._relationships)
+        return iter(
+            self._relationships
+        )
 
     def clear(self) -> None:
         """
