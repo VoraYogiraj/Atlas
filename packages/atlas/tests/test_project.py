@@ -3,6 +3,7 @@ from atlas.core.resource import AtlasResource
 from atlas.graph import AtlasResourceGraph
 from atlas.project import AtlasProject
 from atlas.resource_registry import AtlasResourceRegistry
+from atlas.relationships.relationship import AtlasRelationship
 
 
 def create_resource(name: str) -> AtlasResource:
@@ -227,6 +228,91 @@ def test_project_resource_registry_and_graph_are_independent():
     project = AtlasProject(name="Residential Project")
 
     assert project.resources is not project.graph
+
+
+# ----------------------------------------------------------------------
+# Project → Graph → Resource Registry Integration
+# ----------------------------------------------------------------------
+
+
+def test_project_graph_uses_project_resource_registry():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    assert project.graph.resources is project.resources
+
+
+def test_project_graph_can_query_project_resources():
+    project = AtlasProject(
+        name="Residential Project"
+    )
+
+    wall = create_resource("North Wall")
+
+    project.resources.register(wall)
+
+    assert project.graph.resources.contains(
+        wall.aid
+    )
+
+
+def test_project_graph_rejects_resource_from_another_project():
+    first = AtlasProject(
+        name="Project A"
+    )
+
+    second = AtlasProject(
+        name="Project B"
+    )
+
+    wall = create_resource("North Wall")
+
+    first.resources.register(wall)
+
+    try:
+        second.graph.neighbors(wall)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Project graph should reject resources "
+            "belonging to another project"
+        )
+
+
+def test_project_graph_rejects_relationship_between_foreign_resources():
+    first = AtlasProject(
+        name="Project A"
+    )
+
+    second = AtlasProject(
+        name="Project B"
+    )
+
+    first_wall = create_resource("North Wall")
+    second_wall = create_resource("South Wall")
+
+    first.resources.register(first_wall)
+    second.resources.register(second_wall)
+
+    relationship = AtlasRelationship(
+        id="cross-project-relationship",
+        relationship_type="connects",
+        source=first_wall,
+        target=second_wall,
+    )
+
+    try:
+        first.graph.add_relationship(
+            relationship
+        )
+    except ValueError:
+        pass
+    else:
+        raise AssertionError(
+            "Cross-project relationship should be rejected"
+        )
 
 
 # ----------------------------------------------------------------------
