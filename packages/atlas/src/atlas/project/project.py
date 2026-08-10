@@ -148,18 +148,18 @@ class AtlasProject:
         Registration occurs in both the Classification Registry and
         Classification Hierarchy.
 
-        For child classifications, the parent must already be
+        Child classifications require their parent to already be
         registered with the Project.
 
         Raises
         ------
         ValueError
-            If the Classification is already registered or its parent
-            is not registered.
+            If the Classification is already registered.
+
+        ValueError
+            If the Classification parent is not registered.
         """
 
-        # Validate duplicate registration before mutating either
-        # project classification structure.
         if self._classifications.contains(
             classification.id
         ):
@@ -168,9 +168,10 @@ class AtlasProject:
                 f"{classification.id}"
             )
 
-        # The hierarchy owns the parent/child integrity rule.
-        # Perform this before registry mutation so a failed hierarchy
-        # registration leaves the project unchanged.
+        # Validate and register in the hierarchy first.
+        #
+        # This ensures that a child can only be introduced when
+        # its parent already belongs to this Project.
         self._classification_hierarchy.add(
             classification
         )
@@ -180,8 +181,8 @@ class AtlasProject:
                 classification
             )
         except Exception:
-            # Keep both structures synchronized if the registry
-            # unexpectedly rejects the classification.
+            # Keep the hierarchy and registry synchronized if the
+            # registry unexpectedly rejects the classification.
             self._classification_hierarchy.remove(
                 classification.id
             )
@@ -212,9 +213,7 @@ class AtlasProject:
         if classification is None:
             return None
 
-        # The hierarchy performs the child-integrity check.
-        # If the classification has children, this raises ValueError
-        # and the registry remains unchanged.
+        # The hierarchy enforces the child-integrity rule.
         self._classification_hierarchy.remove(
             classification_id
         )
@@ -244,17 +243,28 @@ class AtlasProject:
     ) -> AtlasResource:
         """
         Register a Resource with the Project.
+
+        Returns the Resource that was registered.
         """
-        return self._registry.register(resource)
+        self._registry.register(resource)
+
+        return resource
 
     def remove_resource(
         self,
-        resource_id: str,
+        resource: AtlasResource,
     ) -> AtlasResource | None:
         """
         Remove a Resource from the Project.
+
+        Returns the removed Resource, or None if it was not registered.
         """
-        return self._registry.unregister(resource_id)
+        if not self._registry.contains(resource.aid):
+            return None
+
+        self._registry.unregister(resource.aid)
+
+        return resource
 
     # ------------------------------------------------------------------
     # Resource Graph
@@ -277,6 +287,8 @@ class AtlasProject:
     ) -> AtlasRelationship:
         """
         Add a Relationship to the Project's Resource Graph.
+
+        Returns the Relationship that was added.
         """
         self._graph.add_relationship(
             relationship
