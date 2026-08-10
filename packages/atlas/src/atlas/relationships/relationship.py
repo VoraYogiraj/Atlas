@@ -4,7 +4,8 @@ Atlas Relationship
 Defines an engineering relationship between two Atlas Resources.
 
 Specification:
-    ENG-005 — Resource Relationships
+ENG-005 — Resource Relationships
+ENG-016 — Relationship Semantics
 """
 
 from __future__ import annotations
@@ -33,6 +34,20 @@ class AtlasRelationship:
 
     description: str = ""
 
+    def __post_init__(self) -> None:
+        """
+        Validate the relationship identity and type.
+        """
+        if not self.id.strip():
+            raise ValueError(
+                "Relationship id cannot be empty"
+            )
+
+        if not self.relationship_type.strip():
+            raise ValueError(
+                "Relationship type cannot be empty"
+            )
+
     @property
     def is_self_reference(self) -> bool:
         """
@@ -40,7 +55,10 @@ class AtlasRelationship:
         """
         return self.source.aid == self.target.aid
 
-    def involves(self, resource: "AtlasResource") -> bool:
+    def involves(
+        self,
+        resource: "AtlasResource",
+    ) -> bool:
         """
         Returns True if the supplied Resource participates
         in this relationship.
