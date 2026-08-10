@@ -1,8 +1,8 @@
 """
 Atlas Classification Hierarchy
 
-Provides collection and lookup management for
-Atlas Classifications.
+Provides collection, integrity, and query management
+for Atlas Classifications.
 
 Specification:
 ENG-017 — Classification Hierarchy
@@ -19,13 +19,17 @@ class AtlasClassificationHierarchy:
     """
     Collection and integrity manager for Atlas Classifications.
 
-    The hierarchy owns classification registrations.
+    AtlasClassification objects remain immutable and define their
+    own parent relationship.
 
-    AtlasClassification objects remain immutable and define their own
-    parent relationship.
+    This hierarchy is responsible for:
 
-    The hierarchy is responsible for ensuring that registered
-    classifications form a coherent parent/child structure.
+        - Classification registration
+        - Classification lookup
+        - Parent integrity
+        - Safe removal
+        - Hierarchy queries
+        - Collection management
     """
 
     def __init__(self) -> None:
@@ -56,7 +60,7 @@ class AtlasClassificationHierarchy:
             If the classification ID already exists.
 
         ValueError
-            If the classification has a parent that is not registered.
+            If the classification has an unregistered parent.
         """
         if classification.id in self._classifications:
             raise ValueError(
@@ -108,6 +112,32 @@ class AtlasClassificationHierarchy:
         return classification_id in self._classifications
 
     # ------------------------------------------------------------------
+    # Validation
+    # ------------------------------------------------------------------
+
+    def _validate_registered(
+        self,
+        classification: AtlasClassification,
+    ) -> None:
+        """
+        Ensure that a Classification belongs to this hierarchy.
+
+        Raises
+        ------
+        ValueError
+            If the Classification is not registered.
+        """
+        registered = self._classifications.get(
+            classification.id
+        )
+
+        if registered is None:
+            raise ValueError(
+                "Classification does not belong to hierarchy: "
+                f"{classification.id}"
+            )
+
+    # ------------------------------------------------------------------
     # Removal
     # ------------------------------------------------------------------
 
@@ -148,6 +178,142 @@ class AtlasClassificationHierarchy:
         return self._classifications.pop(
             classification_id
         )
+
+    # ------------------------------------------------------------------
+    # Hierarchy Queries
+    # ------------------------------------------------------------------
+
+    def roots(self) -> list[AtlasClassification]:
+        """
+        Return all registered root Classifications.
+
+        Roots are returned in registration order.
+        """
+        return [
+            classification
+            for classification in self._classifications.values()
+            if classification.parent is None
+        ]
+
+    def children(
+        self,
+        classification: AtlasClassification,
+    ) -> list[AtlasClassification]:
+        """
+        Return the direct children of a Classification.
+
+        Grandchildren and deeper descendants are not included.
+
+        Children are returned in registration order.
+        """
+        self._validate_registered(classification)
+
+        classification_id = classification.id
+
+        return [
+            registered
+            for registered in self._classifications.values()
+            if (
+                registered.parent is not None
+                and registered.parent.id == classification_id
+            )
+        ]
+
+    def parent(
+        self,
+        classification: AtlasClassification,
+    ) -> AtlasClassification | None:
+        """
+        Return the direct parent of a Classification.
+
+        Returns None for root Classifications.
+        """
+        self._validate_registered(classification)
+
+        parent = classification.parent
+
+        if parent is None:
+            return None
+
+        return self._classifications.get(parent.id)
+
+    def ancestors(
+        self,
+        classification: AtlasClassification,
+    ) -> list[AtlasClassification]:
+        """
+        Return all ancestors of a Classification.
+
+        Ancestors are returned from nearest parent to root.
+
+        Example
+        -------
+        Wall
+            parent -> Building
+            parent -> Physical Resource
+
+        returns:
+
+            [Building, Physical Resource]
+        """
+        self._validate_registered(classification)
+
+        result: list[AtlasClassification] = []
+
+        current = classification.parent
+
+        while current is not None:
+            registered = self._classifications.get(
+                current.id
+            )
+
+            if registered is None:
+                raise ValueError(
+                    "Classification parent is not registered: "
+                    f"{current.id}"
+                )
+
+            result.append(registered)
+            current = registered.parent
+
+        return result
+
+    def descendants(
+        self,
+        classification: AtlasClassification,
+    ) -> list[AtlasClassification]:
+        """
+        Return all descendants of a Classification.
+
+        Descendants are returned in depth-first registration order.
+
+        Direct children are returned before their descendants.
+
+        Example
+        -------
+        Building
+            ├── Wall
+            │   └── Door
+            └── Window
+
+        returns:
+
+            [Wall, Door, Window]
+        """
+        self._validate_registered(classification)
+
+        result: list[AtlasClassification] = []
+
+        def visit(
+            current: AtlasClassification,
+        ) -> None:
+            for child in self.children(current):
+                result.append(child)
+                visit(child)
+
+        visit(classification)
+
+        return result
 
     # ------------------------------------------------------------------
     # Collection
