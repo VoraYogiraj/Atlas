@@ -10,12 +10,14 @@ ENG-004 — Resource Properties
 ENG-005 — Resource Relationships
 ENG-007 — Resource Lifecycle
 ENG-024 — Semantic Tags
+ENG-025 — Resource Categories
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from atlas.categories.category import AtlasCategory
 from atlas.classification.classification import AtlasClassification
 from atlas.core.aid import AtlasID
 from atlas.lifecycle.lifecycle import AtlasLifecycle
@@ -51,6 +53,9 @@ class AtlasResource:
 
         # ENG-024 — Semantic Tags
         self._tags: dict[str, AtlasSemanticTag] = {}
+
+        # ENG-025 — Resource Categories
+        self._categories: dict[str, AtlasCategory] = {}
 
         self._lifecycle = AtlasLifecycle.CREATED
 
@@ -279,6 +284,128 @@ class AtlasResource:
 
         return self._tags.pop(
             tag_id,
+            None,
+        )
+
+    # ------------------------------------------------------------------
+    # Categories
+    # ------------------------------------------------------------------
+
+    @property
+    def categories(self) -> list[AtlasCategory]:
+        """
+        Return the Resource's categories.
+
+        Categories are returned in insertion order.
+        """
+        return list(
+            self._categories.values()
+        )
+
+    def add_category(
+        self,
+        category: AtlasCategory,
+    ) -> AtlasCategory:
+        """
+        Add a category to the Resource.
+
+        Raises
+        ------
+        TypeError
+            If category is not an AtlasCategory.
+
+        ValueError
+            If a category with the same ID is already attached.
+        """
+        if not isinstance(
+            category,
+            AtlasCategory,
+        ):
+            raise TypeError(
+                "category must be an AtlasCategory"
+            )
+
+        if category.id in self._categories:
+            raise ValueError(
+                f"Category already exists: {category.id}"
+            )
+
+        self._categories[category.id] = category
+
+        return category
+
+    def get_category(
+        self,
+        category_id: str,
+    ) -> AtlasCategory | None:
+        """
+        Return a category by ID.
+
+        Returns None when the category is not attached.
+
+        Raises
+        ------
+        TypeError
+            If category_id is not a string.
+        """
+        if not isinstance(
+            category_id,
+            str,
+        ):
+            raise TypeError(
+                "category_id must be a string"
+            )
+
+        return self._categories.get(
+            category_id
+        )
+
+    def has_category(
+        self,
+        category_id: str,
+    ) -> bool:
+        """
+        Return True if the Resource has the specified category.
+
+        Raises
+        ------
+        TypeError
+            If category_id is not a string.
+        """
+        if not isinstance(
+            category_id,
+            str,
+        ):
+            raise TypeError(
+                "category_id must be a string"
+            )
+
+        return category_id in self._categories
+
+    def remove_category(
+        self,
+        category_id: str,
+    ) -> AtlasCategory | None:
+        """
+        Remove and return a category.
+
+        Returns None when the category is not attached.
+
+        Raises
+        ------
+        TypeError
+            If category_id is not a string.
+        """
+        if not isinstance(
+            category_id,
+            str,
+        ):
+            raise TypeError(
+                "category_id must be a string"
+            )
+
+        return self._categories.pop(
+            category_id,
             None,
         )
 
