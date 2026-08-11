@@ -4,11 +4,12 @@ Atlas Resource
 Defines the base engineering entity used throughout Atlas.
 
 Specifications:
-    ENG-001 — Atlas Resource
-    ENG-003 — Resource Classification
-    ENG-004 — Resource Properties
-    ENG-005 — Resource Relationships
-    ENG-007 — Resource Lifecycle
+ENG-001 — Atlas Resource
+ENG-003 — Resource Classification
+ENG-004 — Resource Properties
+ENG-005 — Resource Relationships
+ENG-007 — Resource Lifecycle
+ENG-024 — Semantic Tags
 """
 
 from __future__ import annotations
@@ -18,6 +19,7 @@ from typing import TYPE_CHECKING
 from atlas.classification.classification import AtlasClassification
 from atlas.core.aid import AtlasID
 from atlas.lifecycle.lifecycle import AtlasLifecycle
+from atlas.semantic_tags.tag import AtlasSemanticTag
 
 if TYPE_CHECKING:
     from atlas.properties.property import AtlasProperty
@@ -46,6 +48,9 @@ class AtlasResource:
         self._relationships: list[AtlasRelationship] = []
 
         self._metadata: dict[str, object] = {}
+
+        # ENG-024 — Semantic Tags
+        self._tags: dict[str, AtlasSemanticTag] = {}
 
         self._lifecycle = AtlasLifecycle.CREATED
 
@@ -77,7 +82,10 @@ class AtlasResource:
         return self._name
 
     @name.setter
-    def name(self, value: str | None) -> None:
+    def name(
+        self,
+        value: str | None,
+    ) -> None:
         """Set the Resource name."""
         self._name = value
 
@@ -90,17 +98,31 @@ class AtlasResource:
         """Return the Resource's properties."""
         return self._properties
 
-    def set_property(self, property: AtlasProperty) -> None:
+    def set_property(
+        self,
+        property: AtlasProperty,
+    ) -> None:
         """Add or replace a Resource property."""
         self._properties[property.id] = property
 
-    def get_property(self, property_id: str) -> AtlasProperty | None:
+    def get_property(
+        self,
+        property_id: str,
+    ) -> AtlasProperty | None:
         """Retrieve a property by its ID."""
-        return self._properties.get(property_id)
+        return self._properties.get(
+            property_id
+        )
 
-    def remove_property(self, property_id: str) -> AtlasProperty | None:
+    def remove_property(
+        self,
+        property_id: str,
+    ) -> AtlasProperty | None:
         """Remove and return a property by its ID."""
-        return self._properties.pop(property_id, None)
+        return self._properties.pop(
+            property_id,
+            None,
+        )
 
     # ------------------------------------------------------------------
     # Relationships
@@ -111,13 +133,23 @@ class AtlasResource:
         """Return the Resource's relationships."""
         return self._relationships
 
-    def add_relationship(self, relationship: AtlasRelationship) -> None:
+    def add_relationship(
+        self,
+        relationship: AtlasRelationship,
+    ) -> None:
         """Add a relationship to the Resource."""
-        self._relationships.append(relationship)
+        self._relationships.append(
+            relationship
+        )
 
-    def remove_relationship(self, relationship: AtlasRelationship) -> None:
+    def remove_relationship(
+        self,
+        relationship: AtlasRelationship,
+    ) -> None:
         """Remove a relationship from the Resource."""
-        self._relationships.remove(relationship)
+        self._relationships.remove(
+            relationship
+        )
 
     # ------------------------------------------------------------------
     # Metadata
@@ -129,6 +161,128 @@ class AtlasResource:
         return self._metadata
 
     # ------------------------------------------------------------------
+    # Semantic Tags
+    # ------------------------------------------------------------------
+
+    @property
+    def tags(self) -> list[AtlasSemanticTag]:
+        """
+        Return the Resource's semantic tags.
+
+        Tags are returned in insertion order.
+        """
+        return list(
+            self._tags.values()
+        )
+
+    def add_tag(
+        self,
+        tag: AtlasSemanticTag,
+    ) -> AtlasSemanticTag:
+        """
+        Add a semantic tag to the Resource.
+
+        Raises
+        ------
+        TypeError
+            If tag is not an AtlasSemanticTag.
+
+        ValueError
+            If a tag with the same ID is already attached.
+        """
+        if not isinstance(
+            tag,
+            AtlasSemanticTag,
+        ):
+            raise TypeError(
+                "tag must be an AtlasSemanticTag"
+            )
+
+        if tag.id in self._tags:
+            raise ValueError(
+                f"Semantic tag already exists: {tag.id}"
+            )
+
+        self._tags[tag.id] = tag
+
+        return tag
+
+    def get_tag(
+        self,
+        tag_id: str,
+    ) -> AtlasSemanticTag | None:
+        """
+        Return a semantic tag by ID.
+
+        Returns None when the tag is not attached.
+
+        Raises
+        ------
+        TypeError
+            If tag_id is not a string.
+        """
+        if not isinstance(
+            tag_id,
+            str,
+        ):
+            raise TypeError(
+                "tag_id must be a string"
+            )
+
+        return self._tags.get(
+            tag_id
+        )
+
+    def has_tag(
+        self,
+        tag_id: str,
+    ) -> bool:
+        """
+        Return True if the Resource has a semantic tag.
+
+        Raises
+        ------
+        TypeError
+            If tag_id is not a string.
+        """
+        if not isinstance(
+            tag_id,
+            str,
+        ):
+            raise TypeError(
+                "tag_id must be a string"
+            )
+
+        return tag_id in self._tags
+
+    def remove_tag(
+        self,
+        tag_id: str,
+    ) -> AtlasSemanticTag | None:
+        """
+        Remove and return a semantic tag.
+
+        Returns None when the tag is not attached.
+
+        Raises
+        ------
+        TypeError
+            If tag_id is not a string.
+        """
+        if not isinstance(
+            tag_id,
+            str,
+        ):
+            raise TypeError(
+                "tag_id must be a string"
+            )
+
+        return self._tags.pop(
+            tag_id,
+            None,
+        )
+
+    # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
 
@@ -137,7 +291,10 @@ class AtlasResource:
         """Return the current lifecycle state."""
         return self._lifecycle
 
-    def transition_to(self, target: AtlasLifecycle) -> None:
+    def transition_to(
+        self,
+        target: AtlasLifecycle,
+    ) -> None:
         """
         Transition the Resource to another lifecycle state.
 
@@ -146,7 +303,9 @@ class AtlasResource:
         ValueError
             If the requested lifecycle transition is not allowed.
         """
-        if not self._lifecycle.can_transition_to(target):
+        if not self._lifecycle.can_transition_to(
+            target
+        ):
             raise ValueError(
                 f"Invalid lifecycle transition: "
                 f"{self._lifecycle.value} -> {target.value}"
@@ -156,15 +315,21 @@ class AtlasResource:
 
     def activate(self) -> None:
         """Activate the Resource."""
-        self.transition_to(AtlasLifecycle.ACTIVE)
+        self.transition_to(
+            AtlasLifecycle.ACTIVE
+        )
 
     def archive(self) -> None:
         """Archive the Resource."""
-        self.transition_to(AtlasLifecycle.ARCHIVED)
+        self.transition_to(
+            AtlasLifecycle.ARCHIVED
+        )
 
     def delete(self) -> None:
         """Mark the Resource as deleted."""
-        self.transition_to(AtlasLifecycle.DELETED)
+        self.transition_to(
+            AtlasLifecycle.DELETED
+        )
 
     # ------------------------------------------------------------------
     # Representation

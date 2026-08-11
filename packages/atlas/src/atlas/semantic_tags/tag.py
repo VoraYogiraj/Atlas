@@ -17,19 +17,7 @@ class AtlasSemanticTag:
     """
     Represents an immutable semantic tag.
 
-    A semantic tag provides a reusable semantic meaning that can
-    be associated with one or more Atlas Resources.
-
-    Parameters
-    ----------
-    id:
-        Stable identifier for the semantic tag.
-
-    name:
-        Human-readable name of the semantic tag.
-
-    description:
-        Optional description explaining the semantic meaning.
+    Semantic tags are reusable across multiple Atlas Resources.
     """
 
     id: str
