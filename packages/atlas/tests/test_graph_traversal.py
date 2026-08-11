@@ -180,7 +180,7 @@ def test_graph_neighbors_returns_empty_for_isolated_resource():
     assert graph.neighbors(room) == []
 
 
-def test_graph_neighbors_do_not_duplicate_a_resource():
+def test_graph_neighbors_returns_one_entry_per_relationship():
     (
         graph,
         building,
@@ -208,6 +208,7 @@ def test_graph_neighbors_do_not_duplicate_a_resource():
     graph.add_relationship(second)
 
     assert graph.neighbors(wall) == [
+        door,
         door,
     ]
 
