@@ -82,6 +82,7 @@ class AtlasResourceGraph:
         self._validate_resource(
             relationship.source
         )
+
         self._validate_resource(
             relationship.target
         )
@@ -140,13 +141,14 @@ class AtlasResourceGraph:
         """
         Return Relationships connecting two Resources.
 
-        Relationship direction is ignored for this lookup.
+        Relationship direction is ignored.
 
         Both Resources must belong to this graph.
         """
         self._validate_resource(
             first
         )
+
         self._validate_resource(
             second
         )
@@ -206,12 +208,16 @@ class AtlasResourceGraph:
 
         Relationship direction does not restrict connectivity.
 
-        Outgoing neighbors are returned first, followed by incoming
-        neighbors.
+        IMPORTANT:
+        One Resource is returned for EACH Relationship.
 
-        Each Resource appears at most once.
+        Therefore, if two different Relationships connect the same
+        pair of Resources, the connected Resource appears twice.
 
-        Registration order is preserved within each direction.
+        Outgoing Relationships are returned first, followed by
+        incoming Relationships.
+
+        Relationship registration order is preserved.
 
         The returned Resources are resolved through the graph's
         Resource Registry.
@@ -227,42 +233,33 @@ class AtlasResourceGraph:
 
         resource_id = resource.aid
 
-        outgoing_ids = []
-        incoming_ids = []
+        neighbor_ids = []
 
         # --------------------------------------------------------------
-        # Collect outgoing neighbors first.
+        # Outgoing relationships first.
         # --------------------------------------------------------------
 
         for relationship in self._relationships:
             if relationship.source.aid == resource_id:
-                target_id = relationship.target.aid
-
-                if target_id not in outgoing_ids:
-                    outgoing_ids.append(
-                        target_id
-                    )
+                neighbor_ids.append(
+                    relationship.target.aid
+                )
 
         # --------------------------------------------------------------
-        # Collect incoming neighbors second.
+        # Incoming relationships second.
         # --------------------------------------------------------------
 
         for relationship in self._relationships:
             if relationship.target.aid == resource_id:
-                source_id = relationship.source.aid
+                neighbor_ids.append(
+                    relationship.source.aid
+                )
 
-                if (
-                    source_id not in outgoing_ids
-                    and source_id not in incoming_ids
-                ):
-                    incoming_ids.append(
-                        source_id
-                    )
-
-        neighbor_ids = (
-            outgoing_ids
-            + incoming_ids
-        )
+        # --------------------------------------------------------------
+        # Resolve every relationship endpoint independently.
+        #
+        # Do NOT deduplicate here.
+        # --------------------------------------------------------------
 
         return [
             self._resources.require(
@@ -300,7 +297,8 @@ class AtlasResourceGraph:
                     relationship.source.aid == resource_id
                     or relationship.target.aid == resource_id
                 )
-                and relationship.relationship_type == relationship_type
+                and relationship.relationship_type
+                == relationship_type
             )
         ]
 
@@ -357,6 +355,9 @@ class AtlasResourceGraph:
 
         Raises
         ------
+        TypeError
+            If relationship_type is not a string.
+
         ValueError
             If relationship_type is empty or whitespace.
         """
@@ -388,7 +389,7 @@ class AtlasResourceGraph:
         """
         Return True if two Resources are directly connected.
 
-        This checks direct relationships only.
+        This checks direct Relationships only.
 
         It does not perform multi-hop graph traversal.
         """
@@ -408,16 +409,16 @@ class AtlasResourceGraph:
         resource: AtlasResource,
     ) -> list[AtlasResource]:
         """
-        Return traversal neighbors with outgoing relationships
-        visited before incoming relationships.
+        Return unique traversal neighbors.
 
-        Relationship direction does not restrict reachability, but
-        direction provides deterministic traversal ordering.
+        Unlike neighbors(), this method deliberately deduplicates
+        Resources because traversal operates on Resources rather
+        than individual Relationships.
 
-        Outgoing relationships are returned first, followed by
-        incoming relationships.
+        Outgoing Relationships are visited first, followed by
+        incoming Relationships.
 
-        Duplicate Resources are removed while preserving order.
+        Registration order is preserved within each direction.
         """
         self._validate_resource(
             resource
@@ -428,26 +429,38 @@ class AtlasResourceGraph:
         outgoing_ids = []
         incoming_ids = []
 
+        # --------------------------------------------------------------
+        # Outgoing neighbors.
+        # --------------------------------------------------------------
+
         for relationship in self._relationships:
             if relationship.source.aid == resource_id:
-                if relationship.target.aid not in outgoing_ids:
+                target_id = relationship.target.aid
+
+                if target_id not in outgoing_ids:
                     outgoing_ids.append(
-                        relationship.target.aid
+                        target_id
                     )
 
-            elif relationship.target.aid == resource_id:
-                if relationship.source.aid not in incoming_ids:
+        # --------------------------------------------------------------
+        # Incoming neighbors.
+        # --------------------------------------------------------------
+
+        for relationship in self._relationships:
+            if relationship.target.aid == resource_id:
+                source_id = relationship.source.aid
+
+                if (
+                    source_id not in outgoing_ids
+                    and source_id not in incoming_ids
+                ):
                     incoming_ids.append(
-                        relationship.source.aid
+                        source_id
                     )
 
         neighbor_ids = (
             outgoing_ids
-            + [
-                neighbor_id
-                for neighbor_id in incoming_ids
-                if neighbor_id not in outgoing_ids
-            ]
+            + incoming_ids
         )
 
         return [
@@ -466,7 +479,7 @@ class AtlasResourceGraph:
         Traverse the graph from a starting Resource using breadth-first
         search.
 
-        The starting Resource is always included in the result.
+        The starting Resource is always included.
 
         Relationship direction does not restrict traversal.
 
@@ -583,6 +596,7 @@ class AtlasResourceGraph:
         self._validate_resource(
             source
         )
+
         self._validate_resource(
             target
         )
@@ -623,7 +637,7 @@ class AtlasResourceGraph:
         return False
 
     # ------------------------------------------------------------------
-    # Removal
+    # Relationship Removal
     # ------------------------------------------------------------------
 
     def remove_relationship(
@@ -633,7 +647,7 @@ class AtlasResourceGraph:
         """
         Remove and return a Relationship.
 
-        Returns None if it is not present.
+        Returns None if the Relationship is not present.
         """
         if relationship not in self._relationships:
             return None
