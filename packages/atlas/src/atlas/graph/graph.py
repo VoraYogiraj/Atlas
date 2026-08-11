@@ -79,8 +79,12 @@ class AtlasResourceGraph:
         """
         Ensure both endpoints of a Relationship belong to this graph.
         """
-        self._validate_resource(relationship.source)
-        self._validate_resource(relationship.target)
+        self._validate_resource(
+            relationship.source
+        )
+        self._validate_resource(
+            relationship.target
+        )
 
     # ------------------------------------------------------------------
     # Relationship Registration
@@ -140,8 +144,12 @@ class AtlasResourceGraph:
 
         Both Resources must belong to this graph.
         """
-        self._validate_resource(first)
-        self._validate_resource(second)
+        self._validate_resource(
+            first
+        )
+        self._validate_resource(
+            second
+        )
 
         first_id = first.aid
         second_id = second.aid
@@ -169,8 +177,6 @@ class AtlasResourceGraph:
         Return all Relationships involving a Resource.
 
         The Resource must belong to this graph.
-
-        Relationship direction is ignored.
         """
         self._validate_resource(
             resource
@@ -188,96 +194,6 @@ class AtlasResourceGraph:
         ]
 
     # ------------------------------------------------------------------
-    # ENG-022 — Relationship Queries
-    # ------------------------------------------------------------------
-
-    def outgoing(
-        self,
-        resource: AtlasResource,
-    ) -> list[AtlasRelationship]:
-        """
-        Return Relationships originating from a Resource.
-
-        Only the source endpoint is considered.
-
-        Relationships where the Resource is only the target are
-        excluded.
-
-        Registration order is preserved.
-        """
-        self._validate_resource(
-            resource
-        )
-
-        resource_id = resource.aid
-
-        return [
-            relationship
-            for relationship in self._relationships
-            if relationship.source.aid == resource_id
-        ]
-
-    def incoming(
-        self,
-        resource: AtlasResource,
-    ) -> list[AtlasRelationship]:
-        """
-        Return Relationships terminating at a Resource.
-
-        Only the target endpoint is considered.
-
-        Relationships where the Resource is only the source are
-        excluded.
-
-        Registration order is preserved.
-        """
-        self._validate_resource(
-            resource
-        )
-
-        resource_id = resource.aid
-
-        return [
-            relationship
-            for relationship in self._relationships
-            if relationship.target.aid == resource_id
-        ]
-
-    def for_relationship_type(
-        self,
-        relationship_type: str,
-    ) -> list[AtlasRelationship]:
-        """
-        Return all Relationships having a specific relationship type.
-
-        Registration order is preserved.
-
-        Raises
-        ------
-        ValueError
-            If relationship_type is empty or whitespace.
-        """
-        if not isinstance(
-            relationship_type,
-            str,
-        ):
-            raise TypeError(
-                "relationship_type must be a string"
-            )
-
-        if not relationship_type.strip():
-            raise ValueError(
-                "relationship_type cannot be empty"
-            )
-
-        return [
-            relationship
-            for relationship in self._relationships
-            if relationship.relationship_type
-            == relationship_type
-        ]
-
-    # ------------------------------------------------------------------
     # Graph Queries
     # ------------------------------------------------------------------
 
@@ -288,28 +204,65 @@ class AtlasResourceGraph:
         """
         Return Resources directly connected to a Resource.
 
-        Relationship direction is ignored.
+        Relationship direction does not restrict connectivity.
+
+        Outgoing neighbors are returned first, followed by incoming
+        neighbors.
+
+        Each Resource appears at most once.
+
+        Registration order is preserved within each direction.
 
         The returned Resources are resolved through the graph's
         Resource Registry.
+
+        Raises
+        ------
+        ValueError
+            If the Resource does not belong to this graph.
         """
         self._validate_resource(
             resource
         )
 
         resource_id = resource.aid
-        neighbor_ids: list = []
+
+        outgoing_ids = []
+        incoming_ids = []
+
+        # --------------------------------------------------------------
+        # Collect outgoing neighbors first.
+        # --------------------------------------------------------------
 
         for relationship in self._relationships:
             if relationship.source.aid == resource_id:
-                neighbor_ids.append(
-                    relationship.target.aid
-                )
+                target_id = relationship.target.aid
 
-            elif relationship.target.aid == resource_id:
-                neighbor_ids.append(
-                    relationship.source.aid
-                )
+                if target_id not in outgoing_ids:
+                    outgoing_ids.append(
+                        target_id
+                    )
+
+        # --------------------------------------------------------------
+        # Collect incoming neighbors second.
+        # --------------------------------------------------------------
+
+        for relationship in self._relationships:
+            if relationship.target.aid == resource_id:
+                source_id = relationship.source.aid
+
+                if (
+                    source_id not in outgoing_ids
+                    and source_id not in incoming_ids
+                ):
+                    incoming_ids.append(
+                        source_id
+                    )
+
+        neighbor_ids = (
+            outgoing_ids
+            + incoming_ids
+        )
 
         return [
             self._resources.require(
@@ -347,9 +300,84 @@ class AtlasResourceGraph:
                     relationship.source.aid == resource_id
                     or relationship.target.aid == resource_id
                 )
-                and relationship.relationship_type
-                == relationship_type
+                and relationship.relationship_type == relationship_type
             )
+        ]
+
+    def outgoing(
+        self,
+        resource: AtlasResource,
+    ) -> list[AtlasRelationship]:
+        """
+        Return Relationships originating from a Resource.
+
+        The Resource must belong to this graph.
+        """
+        self._validate_resource(
+            resource
+        )
+
+        resource_id = resource.aid
+
+        return [
+            relationship
+            for relationship in self._relationships
+            if relationship.source.aid == resource_id
+        ]
+
+    def incoming(
+        self,
+        resource: AtlasResource,
+    ) -> list[AtlasRelationship]:
+        """
+        Return Relationships terminating at a Resource.
+
+        The Resource must belong to this graph.
+        """
+        self._validate_resource(
+            resource
+        )
+
+        resource_id = resource.aid
+
+        return [
+            relationship
+            for relationship in self._relationships
+            if relationship.target.aid == resource_id
+        ]
+
+    def for_relationship_type(
+        self,
+        relationship_type: str,
+    ) -> list[AtlasRelationship]:
+        """
+        Return all Relationships of a specific type.
+
+        Registration order is preserved.
+
+        Raises
+        ------
+        ValueError
+            If relationship_type is empty or whitespace.
+        """
+        if not isinstance(
+            relationship_type,
+            str,
+        ):
+            raise TypeError(
+                "relationship_type must be a string"
+            )
+
+        if not relationship_type.strip():
+            raise ValueError(
+                "relationship_type cannot be empty"
+            )
+
+        return [
+            relationship
+            for relationship in self._relationships
+            if relationship.relationship_type
+            == relationship_type
         ]
 
     def connected(
@@ -413,11 +441,14 @@ class AtlasResourceGraph:
                         relationship.source.aid
                     )
 
-        neighbor_ids = outgoing_ids + [
-            neighbor_id
-            for neighbor_id in incoming_ids
-            if neighbor_id not in outgoing_ids
-        ]
+        neighbor_ids = (
+            outgoing_ids
+            + [
+                neighbor_id
+                for neighbor_id in incoming_ids
+                if neighbor_id not in outgoing_ids
+            ]
+        )
 
         return [
             self._resources.require(
@@ -552,7 +583,6 @@ class AtlasResourceGraph:
         self._validate_resource(
             source
         )
-
         self._validate_resource(
             target
         )
