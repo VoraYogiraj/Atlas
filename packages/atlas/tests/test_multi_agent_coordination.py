@@ -25,8 +25,8 @@ from atlas.agents.request import AtlasAgentRequest
 from atlas.agents.result import AtlasAgentResult
 from atlas.agents.runtime import AtlasAgentRuntime
 from atlas.agents.status import AtlasAgentStatus
-from atlas.orchestrator.orchestrator import AtlasOrchestrator
 from atlas.coordination.coordinator import AtlasAgentCoordinator
+from atlas.orchestrator.orchestrator import AtlasOrchestrator
 
 
 # ----------------------------------------------------------------------
@@ -334,7 +334,9 @@ def test_coordinator_adds_delegation_metadata():
         "semantic-agent"
     )
 
-    assert metadata["delegation_depth"] == 0
+    # Root request is depth 0.
+    # Its delegated child request is depth 1.
+    assert metadata["delegation_depth"] == 1
 
 
 def test_coordinator_supports_coordination_id():
@@ -403,7 +405,7 @@ def test_coordinator_preserves_existing_coordination_id():
 # ----------------------------------------------------------------------
 
 
-def test_coordinator_starts_delegation_at_depth_zero():
+def test_coordinator_first_delegation_has_depth_one():
     agent = EchoAgent(
         id="resource-agent",
         name="Resource Agent",
@@ -425,7 +427,7 @@ def test_coordinator_starts_delegation_at_depth_zero():
 
     assert result.output["metadata"][
         "delegation_depth"
-    ] == 0
+    ] == 1
 
 
 def test_coordinator_increments_existing_delegation_depth():
@@ -959,7 +961,9 @@ def test_multi_agent_workflow_can_delegate_resource_to_semantic():
         request_id="semantic-request",
         action="inspect_semantics",
         metadata={
-            "source_request_id": resource_result.request_id,
+            "source_request_id": (
+                resource_result.request_id
+            ),
         },
     )
 
