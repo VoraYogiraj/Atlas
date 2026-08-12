@@ -515,11 +515,11 @@ def test_semantic_agent_list_semantic_tags():
         name="Exterior",
     )
 
-    resource.add_semantic_tag(
+    resource.add_tag(
         structural
     )
 
-    resource.add_semantic_tag(
+    resource.add_tag(
         exterior
     )
 
@@ -551,7 +551,7 @@ def test_semantic_agent_list_semantic_tags_returns_new_list():
 
     structural = create_tag()
 
-    resource.add_semantic_tag(
+    resource.add_tag(
         structural
     )
 
@@ -574,7 +574,7 @@ def test_semantic_agent_list_semantic_tags_returns_new_list():
     ]
 
 
-def test_semantic_agent_get_semantic_tag():
+def test_semantic_agent_get_tag():
     (
         project,
         classification,
@@ -583,7 +583,7 @@ def test_semantic_agent_get_semantic_tag():
 
     tag = create_tag()
 
-    resource.add_semantic_tag(
+    resource.add_tag(
         tag
     )
 
@@ -628,7 +628,7 @@ def test_semantic_agent_get_missing_semantic_tag_returns_none():
     assert result.output is None
 
 
-def test_semantic_agent_has_semantic_tag_true():
+def test_semantic_agent_has_tag_true():
     (
         project,
         classification,
@@ -637,7 +637,7 @@ def test_semantic_agent_has_semantic_tag_true():
 
     tag = create_tag()
 
-    resource.add_semantic_tag(
+    resource.add_tag(
         tag
     )
 
@@ -658,7 +658,7 @@ def test_semantic_agent_has_semantic_tag_true():
     assert result.output is True
 
 
-def test_semantic_agent_has_semantic_tag_false():
+def test_semantic_agent_has_tag_false():
     (
         project,
         classification,
@@ -682,7 +682,7 @@ def test_semantic_agent_has_semantic_tag_false():
     assert result.output is False
 
 
-def test_semantic_agent_add_semantic_tag():
+def test_semantic_agent_add_tag():
     (
         project,
         classification,
@@ -706,12 +706,12 @@ def test_semantic_agent_add_semantic_tag():
 
     assert result.status is AtlasAgentStatus.COMPLETED
     assert result.output is tag
-    assert resource.get_semantic_tag(
+    assert resource.get_tag(
         "structural"
     ) is tag
 
 
-def test_semantic_agent_add_semantic_tag_rejects_invalid_type():
+def test_semantic_agent_add_tag_rejects_invalid_type():
     (
         project,
         classification,
@@ -744,7 +744,7 @@ def test_semantic_agent_add_duplicate_semantic_tag_fails():
 
     tag = create_tag()
 
-    resource.add_semantic_tag(
+    resource.add_tag(
         tag
     )
 
@@ -765,7 +765,7 @@ def test_semantic_agent_add_duplicate_semantic_tag_fails():
     assert result.output is None
 
 
-def test_semantic_agent_remove_semantic_tag():
+def test_semantic_agent_remove_tag():
     (
         project,
         classification,
@@ -774,7 +774,7 @@ def test_semantic_agent_remove_semantic_tag():
 
     tag = create_tag()
 
-    resource.add_semantic_tag(
+    resource.add_tag(
         tag
     )
 
@@ -793,7 +793,7 @@ def test_semantic_agent_remove_semantic_tag():
 
     assert result.status is AtlasAgentStatus.COMPLETED
     assert result.output is tag
-    assert resource.get_semantic_tag(
+    assert resource.get_tag(
         "structural"
     ) is None
 
@@ -1201,11 +1201,11 @@ def test_semantic_agent_get_semantic_context():
         name="Building Envelope",
     )
 
-    resource.add_semantic_tag(
+    resource.add_tag(
         structural
     )
 
-    resource.add_semantic_tag(
+    resource.add_tag(
         exterior
     )
 
@@ -1288,7 +1288,7 @@ def test_semantic_agent_context_is_deterministic():
     tag = create_tag()
     category = create_category()
 
-    resource.add_semantic_tag(
+    resource.add_tag(
         tag
     )
 
@@ -1410,7 +1410,7 @@ def test_tag_and_category_are_independent():
         )
     )
 
-    assert resource.has_semantic_tag(
+    assert resource.has_tag(
         "structural"
     )
 
@@ -1429,7 +1429,7 @@ def test_removing_tag_does_not_remove_category():
     tag = create_tag()
     category = create_category()
 
-    resource.add_semantic_tag(tag)
+    resource.add_tag(tag)
     resource.add_category(category)
 
     agent = create_agent()
@@ -1460,7 +1460,7 @@ def test_removing_category_does_not_remove_tag():
     tag = create_tag()
     category = create_category()
 
-    resource.add_semantic_tag(tag)
+    resource.add_tag(tag)
     resource.add_category(category)
 
     agent = create_agent()
@@ -1476,7 +1476,7 @@ def test_removing_category_does_not_remove_tag():
         )
     )
 
-    assert resource.has_semantic_tag(
+    assert resource.has_tag(
         "structural"
     )
 
