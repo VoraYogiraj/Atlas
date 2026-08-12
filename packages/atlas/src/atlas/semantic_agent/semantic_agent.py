@@ -43,123 +43,43 @@ class AtlasSemanticAgent(AtlasAgent):
             name=self.DEFAULT_NAME,
         )
 
-    # ------------------------------------------------------------------
-    # Execution
-    # ------------------------------------------------------------------
-
     def execute(
         self,
         request: AtlasAgentRequest,
     ) -> AtlasAgentResult:
-        """
-        Execute a Semantic operation.
-
-        Supported actions:
-
-            get_classification
-            get_classification_path
-            list_semantic_tags
-            get_semantic_tag
-            has_semantic_tag
-            add_semantic_tag
-            remove_semantic_tag
-            list_categories
-            get_category
-            has_category
-            add_category
-            remove_category
-            get_semantic_context
-        """
+        """Execute a Semantic operation."""
         try:
             project = self._get_project(request)
-            resource = self._get_resource(
-                request,
-                project,
-            )
-
+            resource = self._get_resource(request, project)
             action = request.action
 
-            if action == "get_classification":
-                return self._get_classification(
+            handlers = {
+                "get_classification": self._get_classification,
+                "get_classification_path": self._get_classification_path,
+                "list_semantic_tags": self._list_semantic_tags,
+                "get_semantic_tag": self._get_semantic_tag,
+                "has_semantic_tag": self._has_semantic_tag,
+                "add_semantic_tag": self._add_semantic_tag,
+                "remove_semantic_tag": self._remove_semantic_tag,
+                "list_categories": self._list_categories,
+                "get_category": self._get_category,
+                "has_category": self._has_category,
+                "add_category": self._add_category,
+                "remove_category": self._remove_category,
+                "get_semantic_context": self._get_semantic_context,
+            }
+
+            handler = handlers.get(action)
+
+            if handler is None:
+                return self._failure(
                     request,
-                    resource,
+                    f"Unsupported Semantic Agent action: {action}",
                 )
 
-            if action == "get_classification_path":
-                return self._get_classification_path(
-                    request,
-                    resource,
-                )
-
-            if action == "list_semantic_tags":
-                return self._list_semantic_tags(
-                    request,
-                    resource,
-                )
-
-            if action == "get_semantic_tag":
-                return self._get_semantic_tag(
-                    request,
-                    resource,
-                )
-
-            if action == "has_semantic_tag":
-                return self._has_semantic_tag(
-                    request,
-                    resource,
-                )
-
-            if action == "add_semantic_tag":
-                return self._add_semantic_tag(
-                    request,
-                    resource,
-                )
-
-            if action == "remove_semantic_tag":
-                return self._remove_semantic_tag(
-                    request,
-                    resource,
-                )
-
-            if action == "list_categories":
-                return self._list_categories(
-                    request,
-                    resource,
-                )
-
-            if action == "get_category":
-                return self._get_category(
-                    request,
-                    resource,
-                )
-
-            if action == "has_category":
-                return self._has_category(
-                    request,
-                    resource,
-                )
-
-            if action == "add_category":
-                return self._add_category(
-                    request,
-                    resource,
-                )
-
-            if action == "remove_category":
-                return self._remove_category(
-                    request,
-                    resource,
-                )
-
-            if action == "get_semantic_context":
-                return self._get_semantic_context(
-                    request,
-                    resource,
-                )
-
-            return self._failure(
+            return handler(
                 request,
-                f"Unsupported Semantic Agent action: {action}",
+                resource,
             )
 
         except Exception as exc:
@@ -222,13 +142,9 @@ class AtlasSemanticAgent(AtlasAgent):
                 "tag_id metadata is required",
             )
 
-        tag = resource.get_semantic_tag(
-            tag_id
-        )
-
         return self._success(
             request,
-            tag,
+            resource.get_tag(tag_id),
         )
 
     def _has_semantic_tag(
@@ -249,9 +165,7 @@ class AtlasSemanticAgent(AtlasAgent):
 
         return self._success(
             request,
-            resource.has_semantic_tag(
-                tag_id
-            ),
+            resource.has_tag(tag_id),
         )
 
     def _add_semantic_tag(
@@ -273,13 +187,9 @@ class AtlasSemanticAgent(AtlasAgent):
                 "tag metadata must be an AtlasSemanticTag",
             )
 
-        added = resource.add_semantic_tag(
-            tag
-        )
-
         return self._success(
             request,
-            added,
+            resource.add_tag(tag),
         )
 
     def _remove_semantic_tag(
@@ -298,13 +208,9 @@ class AtlasSemanticAgent(AtlasAgent):
                 "tag_id metadata is required",
             )
 
-        removed = resource.remove_semantic_tag(
-            tag_id
-        )
-
         return self._success(
             request,
-            removed,
+            resource.remove_tag(tag_id),
         )
 
     # ------------------------------------------------------------------
@@ -337,13 +243,9 @@ class AtlasSemanticAgent(AtlasAgent):
                 "category_id metadata is required",
             )
 
-        category = resource.get_category(
-            category_id
-        )
-
         return self._success(
             request,
-            category,
+            resource.get_category(category_id),
         )
 
     def _has_category(
@@ -364,9 +266,7 @@ class AtlasSemanticAgent(AtlasAgent):
 
         return self._success(
             request,
-            resource.has_category(
-                category_id
-            ),
+            resource.has_category(category_id),
         )
 
     def _add_category(
@@ -388,13 +288,9 @@ class AtlasSemanticAgent(AtlasAgent):
                 "category metadata must be an AtlasCategory",
             )
 
-        added = resource.add_category(
-            category
-        )
-
         return self._success(
             request,
-            added,
+            resource.add_category(category),
         )
 
     def _remove_category(
@@ -413,13 +309,9 @@ class AtlasSemanticAgent(AtlasAgent):
                 "category_id metadata is required",
             )
 
-        removed = resource.remove_category(
-            category_id
-        )
-
         return self._success(
             request,
-            removed,
+            resource.remove_category(category_id),
         )
 
     # ------------------------------------------------------------------
@@ -431,26 +323,18 @@ class AtlasSemanticAgent(AtlasAgent):
         request: AtlasAgentRequest,
         resource: AtlasResource,
     ) -> AtlasAgentResult:
-        context = {
-            "classification": resource.classification,
-            "classification_path": (
-                resource.classification.path
-            ),
-            "semantic_tags": list(
-                resource.tags
-            ),
-            "categories": list(
-                resource.categories
-            ),
-        }
-
         return self._success(
             request,
-            context,
+            {
+                "classification": resource.classification,
+                "classification_path": resource.classification.path,
+                "semantic_tags": list(resource.tags),
+                "categories": list(resource.categories),
+            },
         )
 
     # ------------------------------------------------------------------
-    # Context Validation
+    # Validation
     # ------------------------------------------------------------------
 
     @staticmethod
@@ -459,10 +343,7 @@ class AtlasSemanticAgent(AtlasAgent):
     ) -> AtlasProject:
         project = request.context.project
 
-        if not isinstance(
-            project,
-            AtlasProject,
-        ):
+        if not isinstance(project, AtlasProject):
             raise ValueError(
                 "AtlasProject is required in Agent context"
             )
@@ -474,26 +355,18 @@ class AtlasSemanticAgent(AtlasAgent):
         request: AtlasAgentRequest,
         project: AtlasProject,
     ) -> AtlasResource:
-        resource = request.context.metadata.get(
-            "resource"
-        )
+        resource = request.context.metadata.get("resource")
 
-        if not isinstance(
-            resource,
-            AtlasResource,
-        ):
+        if not isinstance(resource, AtlasResource):
             raise ValueError(
                 "resource metadata must be an AtlasResource"
             )
 
-        registered = project.get_resource(
-            resource.aid
-        )
+        registered = project.get_resource(resource.aid)
 
         if registered is None:
             raise ValueError(
-                "Resource is not registered with Project: "
-                f"{resource.aid}"
+                f"Resource is not registered with Project: {resource.aid}"
             )
 
         return registered
@@ -503,9 +376,7 @@ class AtlasSemanticAgent(AtlasAgent):
         request: AtlasAgentRequest,
         key: str,
     ) -> Any:
-        return request.context.metadata.get(
-            key
-        )
+        return request.context.metadata.get(key)
 
     # ------------------------------------------------------------------
     # Results
