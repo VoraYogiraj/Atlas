@@ -3,7 +3,7 @@
 **Document ID:** ENG-039  
 **Title:** Atlas UI Architecture  
 **Version:** 0.1.0  
-**Status:** Complete  
+**Status:** Proposed  
 **Depends On:** ENG-035A, ENG-036, ENG-037, ENG-038  
 **Phase:** Phase 9 — User Interface  
 **Implementation:** Future UI/Application layer
@@ -200,7 +200,7 @@ A command represents an intended operation.
 
 A command does not itself define the engineering rules governing the operation.
 
-Those rules remain in the Atlas domain/application services.
+Those rules remain with the Atlas domain and application services.
 
 Queries
 
@@ -521,11 +521,8 @@ Similarly, Agents must not depend on specific UI components.
 This permits:
 
 UI → Agent
-
 API → Agent
-
 Automation → Agent
-
 Future AI Planner → Agent
 
 through shared execution contracts.
@@ -657,15 +654,15 @@ Atlas Application
 ┌────────────────────────────────────────┐
 │ Toolbar                                │
 ├────────────┬───────────────────┬───────┤
-│ Explorer   │ Main Workspace    │Inspector
+│ Explorer   │ Main Workspace    │Inspector│
 │            │                   │       │
-│            │ Future 3D View   │       │
-│            │ / Other Views    │       │
+│            │ Future 3D View    │       │
+│            │ / Other Views     │       │
 ├────────────┴───────────────────┴───────┤
 │ Status / Context / Future Panels       │
 └────────────────────────────────────────┘
 
-The exact visual layout is an implementation/design concern.
+The exact visual layout is an implementation and design concern.
 
 The architectural requirement is modular separation between navigation,
 presentation, actions, and future visualization.
