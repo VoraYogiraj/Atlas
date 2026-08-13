@@ -460,16 +460,16 @@ The underlying Atlas model remains consistent.
 
 Conceptually:
 
-                 AtlasResource
-                      │
-       ┌──────────────┼──────────────┐
-       ↓              ↓              ↓
- Architecture    Structure         MEP
- Resource        Resource          Resource
-       │              │              │
-       └──────────────┼──────────────┘
-                      ↓
-              Common Atlas Graph
+            AtlasResource
+                  │
+   ┌──────────────┼──────────────┐
+   ↓              ↓              ↓
+Architecture   Structure         MEP
+Resource       Resource          Resource
+   │              │              │
+   └──────────────┼──────────────┘
+                  ↓
+           Common Atlas Graph
 Architectural Invariant 11 — Canonical Model Over Feature Models
 
 Future features must not introduce a second canonical representation merely because a new subsystem requires specialized behavior.
