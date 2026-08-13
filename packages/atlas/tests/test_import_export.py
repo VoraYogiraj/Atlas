@@ -4,6 +4,7 @@ ENG-038 — Atlas Import / Export
 RED test suite.
 
 Defines the generic adapter boundary for external representations.
+
 No concrete format such as IFC, CAD, Revit, CSV, or PDF is implemented
 by ENG-038 itself.
 """
@@ -14,9 +15,9 @@ import pytest
 
 from atlas.classification.classification import AtlasClassification
 from atlas.core.resource import AtlasResource
-from atlas.export_export.exporter import AtlasExporter
-from atlas.import_export.importer import AtlasImporter
-from atlas.import_export.result import (
+from atlas.exchange.exporter import AtlasExporter
+from atlas.exchange.importer import AtlasImporter
+from atlas.exchange.result import (
     AtlasExportResult,
     AtlasImportResult,
 )
@@ -85,6 +86,7 @@ class DummyExporter(AtlasExporter):
 
 
 def create_project() -> AtlasProject:
+    """Create a valid AtlasProject for exchange tests."""
     classification = AtlasClassification(
         id="building-element",
         name="Building Element",
@@ -283,12 +285,12 @@ def test_import_result_supports_errors():
             name="Imported"
         ),
         errors=[
-            "Conversion warning"
+            "Conversion failure"
         ],
     )
 
     assert result.errors == [
-        "Conversion warning"
+        "Conversion failure"
     ]
 
 
@@ -326,16 +328,16 @@ def test_export_result_supports_errors():
 def test_importer_rejects_invalid_format_id():
     class InvalidImporter(AtlasImporter):
         format_id = ""
-        name = "Invalid"
+        name = "Invalid Importer"
 
         @property
-        def capabilities(self):
+        def capabilities(self) -> frozenset[str]:
             return frozenset()
 
         def import_data(
             self,
             source,
-        ):
+        ) -> AtlasImportResult:
             raise NotImplementedError
 
     with pytest.raises(
@@ -347,16 +349,16 @@ def test_importer_rejects_invalid_format_id():
 def test_exporter_rejects_invalid_format_id():
     class InvalidExporter(AtlasExporter):
         format_id = ""
-        name = "Invalid"
+        name = "Invalid Exporter"
 
         @property
-        def capabilities(self):
+        def capabilities(self) -> frozenset[str]:
             return frozenset()
 
         def export_data(
             self,
-            project,
-        ):
+            project: AtlasProject,
+        ) -> AtlasExportResult:
             raise NotImplementedError
 
     with pytest.raises(
@@ -371,13 +373,13 @@ def test_importer_rejects_invalid_name():
         name = ""
 
         @property
-        def capabilities(self):
+        def capabilities(self) -> frozenset[str]:
             return frozenset()
 
         def import_data(
             self,
             source,
-        ):
+        ) -> AtlasImportResult:
             raise NotImplementedError
 
     with pytest.raises(
@@ -392,13 +394,13 @@ def test_exporter_rejects_invalid_name():
         name = ""
 
         @property
-        def capabilities(self):
+        def capabilities(self) -> frozenset[str]:
             return frozenset()
 
         def export_data(
             self,
-            project,
-        ):
+            project: AtlasProject,
+        ) -> AtlasExportResult:
             raise NotImplementedError
 
     with pytest.raises(
@@ -451,6 +453,7 @@ def test_import_produces_new_project_instance():
     )
 
     assert result.project is not None
+
     assert isinstance(
         result.project,
         AtlasProject,
