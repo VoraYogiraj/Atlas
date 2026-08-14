@@ -262,6 +262,11 @@ def test_panel_lifecycle_is_not_resource_lifecycle() -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# Panel Registry integration
+# ---------------------------------------------------------------------------
+
+
 def test_panel_can_be_registered() -> None:
     """Panel registration must be compatible with ENG-040."""
     workspace = _workspace()
@@ -277,11 +282,6 @@ def test_panel_can_be_registered() -> None:
     assert workspace.panel_registry.get(
         "explorer",
     ) is panel
-
-
-# ---------------------------------------------------------------------------
-# Panel Registry integration
-# ---------------------------------------------------------------------------
 
 
 def test_panel_registry_exists() -> None:
@@ -321,13 +321,14 @@ def test_panel_lookup_uses_panel_id() -> None:
     ) is panel
 
 
-def test_panel_lookup_unknown_id_returns_none() -> None:
-    """Missing panel lookup must remain an explicit empty result."""
+def test_panel_lookup_unknown_id_raises_key_error() -> None:
+    """Missing Panel lookup must fail explicitly."""
     workspace = _workspace()
 
-    assert workspace.panel_registry.get(
-        "missing-panel",
-    ) is None
+    with pytest.raises(KeyError):
+        workspace.panel_registry.get(
+            "missing-panel",
+        )
 
 
 def test_workspace_does_not_own_second_panel_registry() -> None:
@@ -387,7 +388,7 @@ def test_workspace_supports_active_panel_identity() -> None:
         explorer,
     )
 
-    workspace.activate_panel(
+    workspace.set_active_panel(
         "explorer",
     )
 
@@ -416,13 +417,13 @@ def test_workspace_can_activate_another_panel() -> None:
         explorer,
     )
 
-    workspace.activate_panel(
+    workspace.set_active_panel(
         "dashboard",
     )
 
     assert workspace.active_panel_id == "dashboard"
 
-    workspace.activate_panel(
+    workspace.set_active_panel(
         "explorer",
     )
 
@@ -444,7 +445,7 @@ def test_active_panel_identity_is_not_resource_identity() -> None:
         panel,
     )
 
-    workspace.activate_panel(
+    workspace.set_active_panel(
         "inspector",
     )
 
@@ -467,11 +468,11 @@ def test_workspace_can_clear_active_panel() -> None:
         panel,
     )
 
-    workspace.activate_panel(
+    workspace.set_active_panel(
         "dashboard",
     )
 
-    workspace.activate_panel(
+    workspace.set_active_panel(
         None,
     )
 
@@ -483,7 +484,7 @@ def test_workspace_rejects_unknown_active_panel() -> None:
     workspace = _workspace()
 
     with pytest.raises(KeyError):
-        workspace.activate_panel(
+        workspace.set_active_panel(
             "missing-panel",
         )
 
@@ -501,10 +502,12 @@ def test_workspace_panel_order_is_deterministic() -> None:
         panel_id="explorer",
         name="Explorer",
     )
+
     dashboard = _panel(
         panel_id="dashboard",
         name="Dashboard",
     )
+
     inspector = _panel(
         panel_id="inspector",
         name="Inspector",
@@ -517,9 +520,11 @@ def test_workspace_panel_order_is_deterministic() -> None:
     workspace.register_panel(
         explorer,
     )
+
     workspace.register_panel(
         dashboard,
     )
+
     workspace.register_panel(
         inspector,
     )
@@ -549,6 +554,7 @@ def test_equivalent_panel_state_produces_equivalent_order() -> None:
             panel_id="dashboard",
             name="Dashboard",
         )
+
         explorer = _panel(
             panel_id="explorer",
             name="Explorer",
@@ -560,6 +566,7 @@ def test_equivalent_panel_state_produces_equivalent_order() -> None:
         workspace.register_panel(
             explorer,
         )
+
         workspace.register_panel(
             dashboard,
         )
@@ -648,7 +655,7 @@ def test_workspace_selection_is_atlas_id_based() -> None:
 
     resource_id = AtlasID.generate()
 
-    workspace.set_selection(
+    workspace.set_selected_resource(
         resource_id,
     )
 
@@ -800,7 +807,7 @@ def test_panel_activation_does_not_change_project_state() -> None:
         panel,
     )
 
-    workspace.activate_panel(
+    workspace.set_active_panel(
         "dashboard",
     )
 
