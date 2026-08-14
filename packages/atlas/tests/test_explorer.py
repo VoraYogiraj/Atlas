@@ -15,7 +15,7 @@ import pytest
 
 
 # ---------------------------------------------------------------------------
-# Dashboard / Explorer test fixtures
+# Test fixtures
 # ---------------------------------------------------------------------------
 
 
@@ -41,6 +41,7 @@ def _project_with_wall(name: str = "Explorer Project"):
         classification=wall,
         name="External Wall",
     )
+
     project.add_resource(resource)
 
     return project, resource, wall
@@ -133,17 +134,22 @@ def test_explorer_node_is_not_atlas_project() -> None:
 
 def test_explorer_presentation_is_not_atlas_project() -> None:
     """Explorer presentation must not replace the canonical Project."""
-    from atlas.application.explorer import AtlasExplorerPresentation
+    from atlas.application.explorer import (
+        AtlasExplorerNode,
+        AtlasExplorerPresentation,
+    )
     from atlas.project.project import AtlasProject
+
+    root = AtlasExplorerNode(
+        node_id="project",
+        node_type="project",
+        label="Sample Building",
+    )
 
     presentation = AtlasExplorerPresentation(
         project_id="project-001",
         project_name="Sample Building",
-        root=AtlasExplorerPresentation.__annotations__["root"](
-            node_id="project",
-            node_type="project",
-            label="Sample Building",
-        ),
+        root=root,
     )
 
     assert not isinstance(
@@ -857,7 +863,6 @@ def test_explorer_preserves_registry_order() -> None:
     from atlas.application import AtlasApplication
     from atlas.application.explorer import AtlasExplorer
     from atlas.core.resource import AtlasResource
-
     from atlas.project.project import AtlasProject
 
     project = AtlasProject("Registry Order")
