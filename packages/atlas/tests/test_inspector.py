@@ -74,6 +74,7 @@ def _project_with_relationship():
     project.add_resource(target)
 
     relationship = AtlasRelationship(
+        id="relationship-001",
         relationship_type="connects",
         source=source,
         target=target,
@@ -256,26 +257,34 @@ def test_inspector_accepts_workspace_selection() -> None:
     from atlas.application import AtlasApplication
     from atlas.application.inspector import AtlasInspector
     from atlas.application.selection import AtlasResourceSelection
-    from atlas.core.aid import AtlasID
     from atlas.project.project import AtlasProject
 
-    resource_id = AtlasID.generate()
-
-    selection = AtlasResourceSelection(
-        resource_id=resource_id,
+    resource_id = (
+        AtlasResourceSelection.__dataclass_fields__["resource_id"]
     )
 
+    assert resource_id is not None
+
+    project = AtlasProject("Workspace Selection")
+
     inspector = AtlasInspector(
-        application=AtlasApplication(
-            AtlasProject("Workspace Selection"),
-        ),
+        application=AtlasApplication(project),
+    )
+
+    # Use a real AtlasID through the canonical selection object.
+    from atlas.core.aid import AtlasID
+
+    selected_id = AtlasID.generate()
+
+    selection = AtlasResourceSelection(
+        resource_id=selected_id,
     )
 
     inspector.set_selection(
         selection.resource_id,
     )
 
-    assert inspector.selected_resource_id == resource_id
+    assert inspector.selected_resource_id == selected_id
 
 
 def test_inspector_rejects_invalid_selection_identity() -> None:
@@ -552,7 +561,7 @@ def test_inspector_presents_relationships() -> None:
 
     assert len(presentation.relationships) == 1
     assert presentation.relationships[0].relationship_id == (
-        relationship.aid
+        relationship.id
     )
 
 

@@ -5,6 +5,7 @@ ENG-039 — Atlas UI Architecture
 ENG-040 — Atlas UI Application Shell
 ENG-041 — Atlas Dashboard
 ENG-042 — Atlas Explorer
+ENG-043 — Atlas Inspector
 """
 
 from atlas.application.application import AtlasApplication
@@ -24,6 +25,12 @@ from atlas.application.explorer import (
     AtlasExplorerNode,
     AtlasExplorerPresentation,
 )
+from atlas.application.inspector import (
+    AtlasInspector,
+    AtlasInspectorClassification,
+    AtlasInspectorPresentation,
+    AtlasInspectorRelationship,
+)
 from atlas.application.panel import AtlasPanel
 from atlas.application.panel_registry import AtlasPanelRegistry
 from atlas.application.presentation import AtlasResourcePresentation
@@ -34,6 +41,7 @@ from atlas.application.view import AtlasView
 from atlas.application.view_registry import AtlasViewRegistry
 from atlas.application.views import Atlas3DView
 from atlas.application.workspace import AtlasWorkspace
+
 
 __all__ = [
     # ENG-039 — Application Boundary
@@ -66,4 +74,10 @@ __all__ = [
     "AtlasExplorer",
     "AtlasExplorerNode",
     "AtlasExplorerPresentation",
+
+    # ENG-043 — Inspector
+    "AtlasInspector",
+    "AtlasInspectorPresentation",
+    "AtlasInspectorRelationship",
+    "AtlasInspectorClassification",
 ]
