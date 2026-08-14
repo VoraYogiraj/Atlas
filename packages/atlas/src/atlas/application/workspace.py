@@ -2,12 +2,13 @@
 Atlas UI Application Workspace
 
 ENG-040 — Atlas UI Application Shell
+ENG-045 — Atlas Panels
 """
 
 from __future__ import annotations
 
-from uuid import UUID, uuid4
 from typing import Any
+from uuid import UUID, uuid4
 
 from atlas.application.application import AtlasApplication
 from atlas.application.commands import AtlasCommand
@@ -53,6 +54,10 @@ class AtlasWorkspace:
 
         self._lifecycle = "created"
 
+    # ------------------------------------------------------------------
+    # Core properties
+    # ------------------------------------------------------------------
+
     @property
     def workspace_id(self) -> UUID:
         """Return the stable UI workspace identity."""
@@ -94,32 +99,81 @@ class AtlasWorkspace:
         return self._lifecycle
 
     # ------------------------------------------------------------------
-    # Panel operations
+    # Panels
     # ------------------------------------------------------------------
 
-    def register_panel(self, panel: AtlasPanel) -> None:
+    @property
+    def panels(self) -> tuple[AtlasPanel, ...]:
+        """
+        Return registered Panels in deterministic presentation order.
+        """
+        return tuple(
+            sorted(
+                self._panel_registry.get(panel_id)
+                for panel_id in self._panel_registry.ids()
+            , key=lambda panel: (
+                panel.order,
+                panel.panel_id,
+            ))
+        )
+
+    def register_panel(
+        self,
+        panel: AtlasPanel,
+    ) -> None:
         """Register a presentation Panel."""
-        self._panel_registry.register(panel)
+        self._panel_registry.register(
+            panel,
+        )
 
     def set_active_panel(
         self,
         panel_id: str | None,
     ) -> None:
-        """Activate a registered Panel or clear the active Panel."""
+        """
+        Activate a registered Panel or clear the active Panel.
+
+        Active state is kept synchronized with Panel presentation state.
+        """
         if panel_id is None:
+            if self._active_panel_id is not None:
+                previous = self._panel_registry.get(
+                    self._active_panel_id,
+                )
+                previous.set_active(False)
+
             self._active_panel_id = None
             return
 
-        self._panel_registry.get(panel_id)
+        panel = self._panel_registry.get(
+            panel_id,
+        )
+
+        if self._active_panel_id == panel_id:
+            panel.set_active(True)
+            return
+
+        if self._active_panel_id is not None:
+            previous = self._panel_registry.get(
+                self._active_panel_id,
+            )
+            previous.set_active(False)
+
+        panel.set_active(True)
         self._active_panel_id = panel_id
 
     # ------------------------------------------------------------------
-    # View operations
+    # Views
     # ------------------------------------------------------------------
 
-    def register_view(self, view: AtlasView) -> None:
+    def register_view(
+        self,
+        view: AtlasView,
+    ) -> None:
         """Register a main workspace View."""
-        self._view_registry.register(view)
+        self._view_registry.register(
+            view,
+        )
 
     def set_active_view(
         self,
@@ -130,7 +184,9 @@ class AtlasWorkspace:
             self._active_view_id = None
             return
 
-        self._view_registry.get(view_id)
+        self._view_registry.get(
+            view_id,
+        )
         self._active_view_id = view_id
 
     # ------------------------------------------------------------------
@@ -172,7 +228,9 @@ class AtlasWorkspace:
                 "Workspace has no AtlasApplication"
             )
 
-        return self._application.execute(command)
+        return self._application.execute(
+            command,
+        )
 
     def query(
         self,
@@ -186,7 +244,9 @@ class AtlasWorkspace:
                 "Workspace has no AtlasApplication"
             )
 
-        return self._application.query(query)
+        return self._application.query(
+            query,
+        )
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -239,6 +299,12 @@ class AtlasWorkspace:
                 f"Cannot dispose Workspace from "
                 f"state '{self._lifecycle}'"
             )
+
+        for panel_id in self._panel_registry.ids():
+            panel = self._panel_registry.get(
+                panel_id,
+            )
+            panel.set_active(False)
 
         self._active_panel_id = None
         self._active_view_id = None
