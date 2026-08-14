@@ -3,10 +3,21 @@ Atlas Application
 
 ENG-039 — Atlas UI Architecture
 ENG-040 — Atlas UI Application Shell
+ENG-041 — Atlas Dashboard
 """
 
 from atlas.application.application import AtlasApplication
 from atlas.application.commands import AtlasCommand
+from atlas.application.dashboard import (
+    AtlasAgentSummary,
+    AtlasClassificationSummary,
+    AtlasDashboard,
+    AtlasDashboardPresentation,
+    AtlasDashboardSelectionTarget,
+    AtlasRelationshipSummary,
+    AtlasResourceSummary,
+    AtlasValidationSummary,
+)
 from atlas.application.panel import AtlasPanel
 from atlas.application.panel_registry import AtlasPanelRegistry
 from atlas.application.presentation import (
@@ -33,4 +44,12 @@ __all__ = [
     "AtlasPanelRegistry",
     "AtlasView",
     "AtlasViewRegistry",
+    "AtlasDashboard",
+    "AtlasDashboardPresentation",
+    "AtlasDashboardSelectionTarget",
+    "AtlasResourceSummary",
+    "AtlasClassificationSummary",
+    "AtlasRelationshipSummary",
+    "AtlasValidationSummary",
+    "AtlasAgentSummary",
 ]
