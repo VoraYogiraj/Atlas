@@ -252,6 +252,7 @@ class AtlasInspector:
 
     @property
     def selected_resource_id(self) -> AtlasID | None:
+        """Return the currently selected Resource identity."""
         return self._selected_resource_id
 
     def set_selection(
@@ -311,12 +312,14 @@ class AtlasInspector:
 
     @property
     def is_loading(self) -> bool:
+        """Return whether the Inspector is in a loading state."""
         return self._is_loading
 
     def set_loading(
         self,
         loading: bool,
     ) -> None:
+        """Set transient Inspector loading state."""
         if not isinstance(
             loading,
             bool,
@@ -329,12 +332,14 @@ class AtlasInspector:
 
     @property
     def error(self) -> str | None:
+        """Return the current Inspector error state."""
         return self._error
 
     def set_error(
         self,
         message: str | None,
     ) -> None:
+        """Set transient Inspector error state."""
         if message is not None and not isinstance(
             message,
             str,
@@ -357,11 +362,17 @@ class AtlasInspector:
     # Internal builders
     # ------------------------------------------------------------------
 
-    @staticmethod
     def _build_presentation(
+        self,
         resource: AtlasResource,
     ) -> AtlasInspectorPresentation:
-        """Convert canonical Resource state to presentation state."""
+        """
+        Convert canonical Resource state to Inspector presentation state.
+
+        Resource-level fields come from the canonical AtlasResource.
+        Relationship information comes from the canonical Project Graph
+        through AtlasProject.relationships_for_resource().
+        """
 
         classification = resource.classification
 
@@ -373,6 +384,8 @@ class AtlasInspector:
             )
         )
 
+        project = self._application.project
+
         relationship_presentations = tuple(
             AtlasInspectorRelationship(
                 relationship_id=relationship.id,
@@ -381,7 +394,9 @@ class AtlasInspector:
                 target_id=relationship.target.aid,
                 description=relationship.description,
             )
-            for relationship in resource.relationships
+            for relationship in project.relationships_for_resource(
+                resource,
+            )
         )
 
         return AtlasInspectorPresentation(
