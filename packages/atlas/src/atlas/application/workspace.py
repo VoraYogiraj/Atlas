@@ -99,7 +99,7 @@ class AtlasWorkspace:
         return self._lifecycle
 
     # ------------------------------------------------------------------
-    # Panels
+    # Panel operations
     # ------------------------------------------------------------------
 
     @property
@@ -107,14 +107,19 @@ class AtlasWorkspace:
         """
         Return registered Panels in deterministic presentation order.
         """
+        panels = tuple(
+            self._panel_registry.get(panel_id)
+            for panel_id in self._panel_registry.ids()
+        )
+
         return tuple(
             sorted(
-                self._panel_registry.get(panel_id)
-                for panel_id in self._panel_registry.ids()
-            , key=lambda panel: (
-                panel.order,
-                panel.panel_id,
-            ))
+                panels,
+                key=lambda panel: (
+                    panel.order,
+                    panel.panel_id,
+                ),
+            )
         )
 
     def register_panel(
@@ -163,7 +168,7 @@ class AtlasWorkspace:
         self._active_panel_id = panel_id
 
     # ------------------------------------------------------------------
-    # Views
+    # View operations
     # ------------------------------------------------------------------
 
     def register_view(
