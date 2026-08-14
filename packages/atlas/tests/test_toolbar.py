@@ -124,6 +124,7 @@ def test_toolbar_presentation_is_not_application_or_project() -> None:
         presentation,
         AtlasApplication,
     )
+
     assert not isinstance(
         presentation,
         AtlasProject,
@@ -170,6 +171,7 @@ def test_toolbar_does_not_directly_own_project() -> None:
         toolbar,
         "project",
     )
+
     assert not hasattr(
         toolbar,
         "atlas_project",
@@ -201,7 +203,6 @@ def test_toolbar_uses_atlas_command() -> None:
 
 def test_toolbar_does_not_introduce_second_command_identity() -> None:
     """Toolbar must not replace AtlasCommand with a competing command model."""
-    from atlas.application.commands import AtlasCommand
     from atlas.application.toolbar import AtlasToolbarItem
 
     command = _command(
@@ -214,6 +215,7 @@ def test_toolbar_does_not_introduce_second_command_identity() -> None:
     )
 
     assert item.command is command
+
     assert not hasattr(
         item,
         "toolbar_command",
@@ -529,7 +531,12 @@ def test_toolbar_can_clear_selection() -> None:
 
 
 def test_toolbar_delegates_command_execution() -> None:
-    """Toolbar execution must delegate through AtlasApplication."""
+    """
+    Toolbar execution must delegate through AtlasApplication.
+
+    The current ENG-039 Application boundary does not implement arbitrary
+    command names yet, so the delegated result is NotImplementedError.
+    """
     from atlas.application.toolbar import AtlasToolbar
 
     toolbar = AtlasToolbar(
@@ -545,15 +552,48 @@ def test_toolbar_delegates_command_execution() -> None:
         label="Refresh",
     )
 
-    # The existing AtlasApplication contract is intentionally thin.
-    # The Toolbar must delegate execution rather than implement its own
-    # command engine. A command result is expected from the application
-    # boundary once the command is supported.
+    with pytest.raises(NotImplementedError):
+        toolbar.execute(
+            command,
+        )
+
+
+def test_toolbar_delegates_noop_command() -> None:
+    """Toolbar must successfully delegate supported Atlas commands."""
+    from atlas.application.toolbar import AtlasToolbar
+
+    toolbar = AtlasToolbar(
+        application=_application(),
+    )
+
+    command = _command(
+        "noop",
+    )
+
+    toolbar.register_command(
+        command,
+        label="No-op",
+    )
+
     result = toolbar.execute(
         command,
     )
 
-    assert result is not None
+    assert result is None
+
+
+def test_toolbar_rejects_non_command_execution() -> None:
+    """Toolbar must accept only the canonical AtlasCommand."""
+    from atlas.application.toolbar import AtlasToolbar
+
+    toolbar = AtlasToolbar(
+        application=_application(),
+    )
+
+    with pytest.raises(TypeError):
+        toolbar.execute(
+            "not-a-command",  # type: ignore[arg-type]
+        )
 
 
 def test_toolbar_does_not_directly_mutate_resource() -> None:
@@ -569,10 +609,12 @@ def test_toolbar_does_not_directly_mutate_resource() -> None:
         toolbar,
         "resource",
     )
+
     assert not hasattr(
         toolbar,
         "atlas_resource",
     )
+
     assert not issubclass(
         type(toolbar),
         AtlasResource,
@@ -600,7 +642,9 @@ def test_toolbar_supports_dashboard_navigation_command() -> None:
 
     presentation = toolbar.refresh()
 
-    assert presentation.items[0].command.name == "open_dashboard"
+    assert presentation.items[0].command.name == (
+        "open_dashboard"
+    )
 
 
 def test_toolbar_supports_explorer_navigation_command() -> None:
@@ -619,7 +663,9 @@ def test_toolbar_supports_explorer_navigation_command() -> None:
 
     presentation = toolbar.refresh()
 
-    assert presentation.items[0].command.name == "open_explorer"
+    assert presentation.items[0].command.name == (
+        "open_explorer"
+    )
 
 
 def test_toolbar_supports_inspector_navigation_command() -> None:
@@ -639,7 +685,10 @@ def test_toolbar_supports_inspector_navigation_command() -> None:
 
     presentation = toolbar.refresh()
 
-    assert presentation.items[0].command.name == "open_inspector"
+    assert presentation.items[0].command.name == (
+        "open_inspector"
+    )
+
     assert presentation.items[0].enabled is False
 
 
@@ -680,9 +729,8 @@ def test_toolbar_supports_explorer_commands(
 
     presentation = toolbar.refresh()
 
-    assert (
-        presentation.items[0].command.name
-        == command_name
+    assert presentation.items[0].command.name == (
+        command_name
     )
 
 
@@ -707,9 +755,8 @@ def test_toolbar_supports_refresh_inspector_command() -> None:
 
     presentation = toolbar.refresh()
 
-    assert (
-        presentation.items[0].command.name
-        == "refresh_inspector"
+    assert presentation.items[0].command.name == (
+        "refresh_inspector"
     )
 
 
@@ -750,16 +797,15 @@ def test_toolbar_exposes_loading_state() -> None:
 
 def test_toolbar_loading_state_is_ui_state() -> None:
     """Loading state must not be written into Atlas Core."""
+    from atlas.application import AtlasApplication
     from atlas.application.toolbar import AtlasToolbar
-    from atlas.project.project import AtlasProject
 
     project = _project()
 
     toolbar = AtlasToolbar(
-        application=__import__(
-            "atlas.application",
-            fromlist=["AtlasApplication"],
-        ).AtlasApplication(project),
+        application=AtlasApplication(
+            project,
+        ),
     )
 
     toolbar.set_loading(
@@ -845,6 +891,7 @@ def test_toolbar_panel_identity_is_toolbar() -> None:
 
 def test_toolbar_refresh_does_not_mutate_project() -> None:
     """Toolbar refresh must not mutate engineering state."""
+    from atlas.application import AtlasApplication
     from atlas.application.toolbar import AtlasToolbar
 
     project = _project()
@@ -853,10 +900,9 @@ def test_toolbar_refresh_does_not_mutate_project() -> None:
     before_relationships = project.relationship_count
 
     toolbar = AtlasToolbar(
-        application=__import__(
-            "atlas.application",
-            fromlist=["AtlasApplication"],
-        ).AtlasApplication(project),
+        application=AtlasApplication(
+            project,
+        ),
     )
 
     toolbar.refresh()
@@ -877,6 +923,7 @@ def test_toolbar_does_not_own_resource_registry() -> None:
         toolbar,
         "resource_registry",
     )
+
     assert not hasattr(
         toolbar,
         "toolbar_resource_registry",
@@ -895,10 +942,12 @@ def test_toolbar_does_not_own_graph() -> None:
         toolbar,
         "graph",
     )
+
     assert not hasattr(
         toolbar,
         "resource_graph",
     )
+
     assert not hasattr(
         toolbar,
         "toolbar_graph",
@@ -917,6 +966,7 @@ def test_toolbar_does_not_own_command_engine() -> None:
         toolbar,
         "command_engine",
     )
+
     assert not hasattr(
         toolbar,
         "toolbar_command_engine",
@@ -940,6 +990,7 @@ def test_toolbar_does_not_own_serializer() -> None:
         toolbar,
         "serializer",
     )
+
     assert not hasattr(
         toolbar,
         "json_serializer",
@@ -958,10 +1009,12 @@ def test_toolbar_does_not_own_persistence() -> None:
         toolbar,
         "persistence",
     )
+
     assert not hasattr(
         toolbar,
         "save",
     )
+
     assert not hasattr(
         toolbar,
         "load",
@@ -980,6 +1033,7 @@ def test_toolbar_does_not_own_exchange() -> None:
         toolbar,
         "importer",
     )
+
     assert not hasattr(
         toolbar,
         "exporter",
@@ -1003,10 +1057,12 @@ def test_toolbar_does_not_own_agent_runtime() -> None:
         toolbar,
         "agent_runtime",
     )
+
     assert not hasattr(
         toolbar,
         "orchestrator",
     )
+
     assert not hasattr(
         toolbar,
         "coordinator",
@@ -1044,14 +1100,17 @@ def test_toolbar_does_not_own_3d_engine() -> None:
         toolbar,
         "scene",
     )
+
     assert not hasattr(
         toolbar,
         "camera",
     )
+
     assert not hasattr(
         toolbar,
         "gizmos",
     )
+
     assert not hasattr(
         toolbar,
         "renderer",
