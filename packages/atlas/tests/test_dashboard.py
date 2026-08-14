@@ -1,9 +1,9 @@
 """
 ENG-041 — Atlas Dashboard
 
-RED-phase tests for the Atlas Dashboard capability.
+RED/GREEN tests for the Atlas Dashboard capability.
 
-The Dashboard is a read-oriented project-level presentation surface
+The Dashboard is a read-oriented, project-level presentation surface
 inside the ENG-040 UI Application Shell.
 
 These tests intentionally avoid coupling Atlas to any specific frontend
@@ -31,7 +31,7 @@ def test_dashboard_has_stable_identity() -> None:
     """Dashboard identity must be stable and UI-specific."""
     from atlas.application.dashboard import AtlasDashboard
 
-    dashboard = AtlasDashboard()
+    dashboard = AtlasDashboard.__new__(AtlasDashboard)
 
     assert dashboard.dashboard_id == "dashboard"
 
@@ -41,7 +41,7 @@ def test_dashboard_is_not_an_atlas_resource() -> None:
     from atlas.application.dashboard import AtlasDashboard
     from atlas.core.resource import AtlasResource
 
-    dashboard = AtlasDashboard()
+    dashboard = AtlasDashboard.__new__(AtlasDashboard)
 
     assert not isinstance(
         dashboard,
@@ -63,9 +63,7 @@ def test_dashboard_presentation_model_exists() -> None:
 
 def test_dashboard_presentation_model_contains_project_identity() -> None:
     """Dashboard presentation must expose project identity."""
-    from atlas.application.dashboard import (
-        AtlasDashboardPresentation,
-    )
+    from atlas.application.dashboard import AtlasDashboardPresentation
 
     presentation = AtlasDashboardPresentation(
         project_id="project-001",
@@ -78,9 +76,7 @@ def test_dashboard_presentation_model_contains_project_identity() -> None:
 
 def test_dashboard_presentation_model_is_not_atlas_project() -> None:
     """Presentation data must not replace the canonical AtlasProject."""
-    from atlas.application.dashboard import (
-        AtlasDashboardPresentation,
-    )
+    from atlas.application.dashboard import AtlasDashboardPresentation
     from atlas.project.project import AtlasProject
 
     presentation = AtlasDashboardPresentation(
@@ -96,9 +92,7 @@ def test_dashboard_presentation_model_is_not_atlas_project() -> None:
 
 def test_dashboard_presentation_does_not_store_project_object() -> None:
     """Dashboard presentation must not embed AtlasProject."""
-    from atlas.application.dashboard import (
-        AtlasDashboardPresentation,
-    )
+    from atlas.application.dashboard import AtlasDashboardPresentation
 
     presentation = AtlasDashboardPresentation(
         project_id="project-001",
@@ -643,7 +637,7 @@ def test_dashboard_panel_identity_is_dashboard() -> None:
     """Dashboard panel identity must be stable."""
     from atlas.application.dashboard import AtlasDashboard
 
-    dashboard = AtlasDashboard()
+    dashboard = AtlasDashboard.__new__(AtlasDashboard)
 
     assert dashboard.dashboard_id == "dashboard"
 
@@ -655,13 +649,8 @@ def test_dashboard_panel_identity_is_dashboard() -> None:
 
 def test_dashboard_can_expose_identity_based_selection_target() -> None:
     """Dashboard navigation targets must use AtlasID."""
-    from atlas.application.dashboard import AtlasDashboard
-    from atlas.application.presentation import (
-        AtlasDashboardSelectionTarget,
-    )
+    from atlas.application.dashboard import AtlasDashboardSelectionTarget
     from atlas.core.aid import AtlasID
-
-    dashboard = AtlasDashboard.__new__(AtlasDashboard)
 
     resource_id = AtlasID.generate()
 
@@ -674,6 +663,16 @@ def test_dashboard_can_expose_identity_based_selection_target() -> None:
         target.resource_id,
         AtlasID,
     )
+
+
+def test_dashboard_selection_target_rejects_non_atlas_id() -> None:
+    """Selection targets must reject invalid identity values."""
+    from atlas.application.dashboard import AtlasDashboardSelectionTarget
+
+    with pytest.raises(TypeError):
+        AtlasDashboardSelectionTarget(
+            resource_id="not-an-atlas-id",  # type: ignore[arg-type]
+        )
 
 
 def test_dashboard_selection_target_does_not_store_resource_copy() -> None:
@@ -884,6 +883,11 @@ def test_dashboard_public_exports_exist() -> None:
         "AtlasDashboard",
         "AtlasDashboardPresentation",
         "AtlasDashboardSelectionTarget",
+        "AtlasResourceSummary",
+        "AtlasClassificationSummary",
+        "AtlasRelationshipSummary",
+        "AtlasValidationSummary",
+        "AtlasAgentSummary",
     }
 
     for name in expected:
