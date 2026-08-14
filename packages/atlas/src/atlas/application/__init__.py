@@ -6,6 +6,7 @@ ENG-040 — Atlas UI Application Shell
 ENG-041 — Atlas Dashboard
 ENG-042 — Atlas Explorer
 ENG-043 — Atlas Inspector
+ENG-044 — Atlas Toolbar
 """
 
 from atlas.application.application import AtlasApplication
@@ -36,6 +37,11 @@ from atlas.application.panel_registry import AtlasPanelRegistry
 from atlas.application.presentation import AtlasResourcePresentation
 from atlas.application.queries import AtlasQuery
 from atlas.application.selection import AtlasResourceSelection
+from atlas.application.toolbar import (
+    AtlasToolbar,
+    AtlasToolbarItem,
+    AtlasToolbarPresentation,
+)
 from atlas.application.ui_state import AtlasUIState
 from atlas.application.view import AtlasView
 from atlas.application.view_registry import AtlasViewRegistry
@@ -80,4 +86,9 @@ __all__ = [
     "AtlasInspectorPresentation",
     "AtlasInspectorRelationship",
     "AtlasInspectorClassification",
+
+    # ENG-044 — Toolbar
+    "AtlasToolbar",
+    "AtlasToolbarItem",
+    "AtlasToolbarPresentation",
 ]
