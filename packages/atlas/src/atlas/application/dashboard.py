@@ -15,7 +15,6 @@ agents, persistence, or exchange layers.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 from atlas.application.application import AtlasApplication
 from atlas.core.aid import AtlasID
@@ -41,7 +40,7 @@ class AtlasResourceSummary:
 
 @dataclass(frozen=True, slots=True)
 class AtlasClassificationSummary:
-    """Derived classification counts."""
+    """Derived Resource distribution by Classification."""
 
     counts: dict[str, int] = field(
         default_factory=dict,
@@ -50,7 +49,7 @@ class AtlasClassificationSummary:
 
 @dataclass(frozen=True, slots=True)
 class AtlasRelationshipSummary:
-    """Derived relationship counts."""
+    """Derived Relationship counts."""
 
     total: int = 0
     by_type: dict[str, int] = field(
@@ -83,7 +82,7 @@ class AtlasDashboardSelectionTarget:
     """
     Identity-based Dashboard navigation target.
 
-    The target stores only AtlasID, never a Resource object.
+    The target stores only an AtlasID and never embeds an AtlasResource.
     """
 
     resource_id: AtlasID
@@ -113,21 +112,27 @@ class AtlasDashboardPresentation:
 
     project_id: str
     project_name: str
+
     resource_summary: AtlasResourceSummary = field(
         default_factory=AtlasResourceSummary,
     )
+
     classification_summary: AtlasClassificationSummary = field(
         default_factory=AtlasClassificationSummary,
     )
+
     relationship_summary: AtlasRelationshipSummary = field(
         default_factory=AtlasRelationshipSummary,
     )
+
     validation_summary: AtlasValidationSummary = field(
         default_factory=AtlasValidationSummary,
     )
+
     agent_summary: AtlasAgentSummary = field(
         default_factory=AtlasAgentSummary,
     )
+
     project_status: str = "Ready"
 
     def __post_init__(self) -> None:
@@ -203,6 +208,7 @@ class AtlasDashboard:
         """
         Derive a fresh Dashboard presentation from canonical Atlas state.
         """
+
         project = self._application.project
 
         resource_summary = self._build_resource_summary(
@@ -217,7 +223,7 @@ class AtlasDashboard:
 
         relationship_summary = (
             self._build_relationship_summary(
-                project.relationships,
+                project,
             )
         )
 
@@ -239,72 +245,94 @@ class AtlasDashboard:
         )
 
     # ------------------------------------------------------------------
-    # Derived summaries
+    # Resource summary
     # ------------------------------------------------------------------
 
     @staticmethod
     def _build_resource_summary(
-        resources: Any,
+        resources,
     ) -> AtlasResourceSummary:
         """
-        Build Resource counts from the canonical Resource collection.
+        Build Resource counts from the canonical Resource Registry.
         """
-        items = tuple(resources)
 
+        total = 0
         active = 0
         archived = 0
         deleted = 0
+
         by_classification: dict[str, int] = {}
 
-        for resource in items:
-            lifecycle = str(resource.lifecycle).lower()
+        for resource in resources:
+            total += 1
 
-            if lifecycle.endswith("active"):
+            lifecycle = resource.lifecycle
+
+            lifecycle_name = getattr(
+                lifecycle,
+                "name",
+                str(lifecycle),
+            ).lower()
+
+            if lifecycle_name == "active":
                 active += 1
-            elif lifecycle.endswith("archived"):
+            elif lifecycle_name == "archived":
                 archived += 1
-            elif lifecycle.endswith("deleted"):
+            elif lifecycle_name == "deleted":
                 deleted += 1
 
-            classification = str(
-                resource.classification
+            classification = resource.classification
+
+            classification_name = getattr(
+                classification,
+                "name",
+                str(classification),
             )
 
-            by_classification[classification] = (
+            by_classification[classification_name] = (
                 by_classification.get(
-                    classification,
+                    classification_name,
                     0,
                 )
                 + 1
             )
 
         return AtlasResourceSummary(
-            total=len(items),
+            total=total,
             active=active,
             archived=archived,
             deleted=deleted,
             by_classification=by_classification,
         )
 
+    # ------------------------------------------------------------------
+    # Classification summary
+    # ------------------------------------------------------------------
+
     @staticmethod
     def _build_classification_summary(
-        resources: Any,
+        resources,
     ) -> AtlasClassificationSummary:
         """
-        Build Resource distribution by classification.
+        Build Resource distribution by Classification.
 
         Classification truth remains in Atlas Core.
         """
+
         counts: dict[str, int] = {}
 
-        for resource in tuple(resources):
-            classification = str(
-                resource.classification
+        for resource in resources:
+            classification = resource.classification
+
+            classification_name = getattr(
+                classification,
+                "name",
+                str(classification),
             )
 
-            counts[classification] = (
+            counts[classification_name] = (
                 counts.get(
-                    classification,
+                    classification_name,
                     0,
                 )
                 + 1
@@ -314,45 +342,74 @@ class AtlasDashboard:
             counts=counts,
         )
 
+    # ------------------------------------------------------------------
+    # Relationship summary
+    # ------------------------------------------------------------------
+
     @staticmethod
     def _build_relationship_summary(
-        relationships: Any,
+        project,
     ) -> AtlasRelationshipSummary:
         """
-        Build relationship counts from the canonical Project Graph.
+        Build Relationship counts using the canonical Project Graph.
+
+        AtlasProject exposes relationship_count and relationship queries,
+        rather than a public `relationships` collection.
         """
-        counts: dict[str, int] = {}
 
-        items = tuple(relationships)
+        total = project.relationship_count
 
-        for relationship in items:
-            relationship_type = (
-                relationship.relationship_type
-            )
+        by_type: dict[str, int] = {}
 
-            counts[relationship_type] = (
-                counts.get(
-                    relationship_type,
-                    0,
+        # Relationship types are discovered from the canonical graph
+        # relationships by traversing project resources and querying the
+        # existing relationship API.
+        seen_relationship_ids: set[AtlasID] = set()
+
+        for resource in project.resources:
+            for relationship in project.relationships_for_resource(
+                resource
+            ):
+                if relationship.aid in seen_relationship_ids:
+                    continue
+
+                seen_relationship_ids.add(
+                    relationship.aid
                 )
-                + 1
-            )
+
+                relationship_type = (
+                    relationship.relationship_type
+                )
+
+                by_type[relationship_type] = (
+                    by_type.get(
+                        relationship_type,
+                        0,
+                    )
+                    + 1
+                )
 
         return AtlasRelationshipSummary(
-            total=len(items),
-            by_type=counts,
+            total=total,
+            by_type=by_type,
         )
 
+    # ------------------------------------------------------------------
+    # Validation summary
+    # ------------------------------------------------------------------
+
+    @staticmethod
     def _build_validation_summary(
-        self,
     ) -> AtlasValidationSummary:
         """
-        Provide the current high-level validation summary.
+        Return the current high-level validation summary.
 
-        ENG-041 does not reimplement validation. Until the application layer
-        exposes a dedicated dashboard validation query, an empty valid summary
-        is returned.
+        ENG-041 does not reimplement validation.
+
+        Until a dedicated Dashboard validation query is introduced,
+        an empty valid summary is returned.
         """
+
         return AtlasValidationSummary(
             status="No findings",
             errors=0,
@@ -360,15 +417,20 @@ class AtlasDashboard:
             passed=0,
         )
 
+    # ------------------------------------------------------------------
+    # Agent summary
+    # ------------------------------------------------------------------
+
+    @staticmethod
     def _build_agent_summary(
-        self,
     ) -> AtlasAgentSummary:
         """
-        Provide the current high-level Agent summary.
+        Return the current high-level Agent summary.
 
-        Agent execution remains owned by the existing Agent Runtime. The
-        Dashboard deliberately does not create or own an Agent Runtime.
+        Agent execution remains owned by the existing Agent Runtime.
+        The Dashboard deliberately does not create or own an Agent Runtime.
         """
+
         return AtlasAgentSummary(
             active=0,
             completed=0,
