@@ -15,6 +15,38 @@ import pytest
 
 
 # ---------------------------------------------------------------------------
+# Dashboard / Explorer test fixtures
+# ---------------------------------------------------------------------------
+
+
+def _wall_classification():
+    from atlas.classification.classification import AtlasClassification
+
+    return AtlasClassification(
+        id="wall",
+        name="Wall",
+    )
+
+
+def _project_with_wall(name: str = "Explorer Project"):
+    from atlas.core.resource import AtlasResource
+    from atlas.project.project import AtlasProject
+
+    project = AtlasProject(name)
+
+    wall = _wall_classification()
+    project.add_classification(wall)
+
+    resource = AtlasResource(
+        classification=wall,
+        name="External Wall",
+    )
+    project.add_resource(resource)
+
+    return project, resource, wall
+
+
+# ---------------------------------------------------------------------------
 # Explorer type and identity
 # ---------------------------------------------------------------------------
 
@@ -107,6 +139,11 @@ def test_explorer_presentation_is_not_atlas_project() -> None:
     presentation = AtlasExplorerPresentation(
         project_id="project-001",
         project_name="Sample Building",
+        root=AtlasExplorerPresentation.__annotations__["root"](
+            node_id="project",
+            node_type="project",
+            label="Sample Building",
+        ),
     )
 
     assert not isinstance(
@@ -168,18 +205,10 @@ def test_explorer_can_present_resources() -> None:
     """Explorer must expose canonical Resources."""
     from atlas.application import AtlasApplication
     from atlas.application.explorer import AtlasExplorer
-    from atlas.core.resource import AtlasResource
-    from atlas.project.project import AtlasProject
 
-    project = AtlasProject("Resource Navigation")
-
-    # The exact Resource registration contract is exercised here through
-    # the canonical Project API.
-    resource = AtlasResource(
-        classification="wall",
-        name="External Wall",
+    project, resource, _ = _project_with_wall(
+        "Resource Navigation",
     )
-    project.add_resource(resource)
 
     explorer = AtlasExplorer(
         application=AtlasApplication(project),
@@ -203,16 +232,10 @@ def test_explorer_resource_identity_is_atlas_id() -> None:
     from atlas.application import AtlasApplication
     from atlas.application.explorer import AtlasExplorer
     from atlas.core.aid import AtlasID
-    from atlas.core.resource import AtlasResource
-    from atlas.project.project import AtlasProject
 
-    project = AtlasProject("Resource Identity")
-
-    resource = AtlasResource(
-        classification="wall",
-        name="Wall 001",
+    project, resource, _ = _project_with_wall(
+        "Resource Identity",
     )
-    project.add_resource(resource)
 
     explorer = AtlasExplorer(
         application=AtlasApplication(project),
@@ -304,10 +327,10 @@ def test_explorer_can_group_resources_by_classification() -> None:
     from atlas.application.explorer import AtlasExplorer
     from atlas.project.project import AtlasProject
 
-    project = AtlasProject("Grouping")
-
     explorer = AtlasExplorer(
-        application=AtlasApplication(project),
+        application=AtlasApplication(
+            AtlasProject("Grouping"),
+        ),
     )
 
     presentation = explorer.refresh(
@@ -834,16 +857,22 @@ def test_explorer_preserves_registry_order() -> None:
     from atlas.application import AtlasApplication
     from atlas.application.explorer import AtlasExplorer
     from atlas.core.resource import AtlasResource
+
     from atlas.project.project import AtlasProject
 
     project = AtlasProject("Registry Order")
 
+    wall = _wall_classification()
+
+    project.add_classification(wall)
+
     first = AtlasResource(
-        classification="wall",
+        classification=wall,
         name="Wall A",
     )
+
     second = AtlasResource(
-        classification="wall",
+        classification=wall,
         name="Wall B",
     )
 
