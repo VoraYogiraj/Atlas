@@ -8,9 +8,11 @@ ENG-042 — Atlas Explorer
 ENG-043 — Atlas Inspector
 ENG-044 — Atlas Toolbar
 ENG-046 — Atlas Scene
+ENG-047 — Atlas Camera
 """
 
 from atlas.application.application import AtlasApplication
+from atlas.application.camera import AtlasCamera
 from atlas.application.commands import AtlasCommand
 from atlas.application.dashboard import (
     AtlasAgentSummary,
@@ -71,6 +73,9 @@ __all__ = [
     # ENG-046 — Scene
     "AtlasScene",
     "AtlasSceneNode",
+
+    # ENG-047 — Camera
+    "AtlasCamera",
 
     # ENG-041 — Dashboard
     "AtlasDashboard",
