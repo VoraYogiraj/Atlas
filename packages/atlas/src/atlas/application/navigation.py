@@ -88,8 +88,8 @@ def _rotate_x(
 
     return (
         vector[0],
-        cosine * vector[1] - sine * vector[2],
-        sine * vector[1] + cosine * vector[2],
+        cosine * vector[1] + sine * vector[2],
+        -sine * vector[1] + cosine * vector[2],
     )
 
 
@@ -138,7 +138,7 @@ class AtlasNavigation:
         Orbit the camera around its target.
 
         Positive yaw rotates the camera around the world Y axis.
-        Positive pitch rotates the camera upward around the local X axis.
+        Positive pitch rotates the camera upward around the X axis.
 
         The target remains unchanged and the camera-target distance is
         preserved.
@@ -154,18 +154,22 @@ class AtlasNavigation:
         yaw_radians = math.radians(yaw)
         pitch_radians = math.radians(pitch)
 
-        rotated = _rotate_y(offset, yaw_radians)
-
-        # Apply pitch around the X axis after yaw. This establishes the
-        # deterministic convention used by ENG-048.
-        rotated = _rotate_x(rotated, pitch_radians)
-
-        self._camera.set_position(
-            _vector_add(
-                self._camera.target,
-                rotated,
-            )
+        rotated = _rotate_y(
+            offset,
+            yaw_radians,
         )
+
+        rotated = _rotate_x(
+            rotated,
+            pitch_radians,
+        )
+
+        new_position = _vector_add(
+            self._camera.target,
+            rotated,
+        )
+
+        self._camera.set_position(new_position)
 
     def pan(
         self,
@@ -181,12 +185,17 @@ class AtlasNavigation:
         x = _number(delta_x, "delta_x")
         y = _number(delta_y, "delta_y")
 
-        displacement: Vector3 = (x, y, 0.0)
+        displacement: Vector3 = (
+            x,
+            y,
+            0.0,
+        )
 
         new_position = _vector_add(
             self._camera.position,
             displacement,
         )
+
         new_target = _vector_add(
             self._camera.target,
             displacement,
@@ -217,14 +226,19 @@ class AtlasNavigation:
             return
 
         if self._camera.projection == "orthographic":
-            new_scale = self._camera.orthographic_scale - value
+            new_scale = (
+                self._camera.orthographic_scale - value
+            )
 
             if new_scale <= 0.0:
                 raise ValueError(
-                    "zoom would produce a non-positive orthographic scale"
+                    "zoom would produce a non-positive "
+                    "orthographic scale"
                 )
 
-            self._camera.set_orthographic_scale(new_scale)
+            self._camera.set_orthographic_scale(
+                new_scale,
+            )
             return
 
         offset = _vector_subtract(
@@ -238,7 +252,8 @@ class AtlasNavigation:
 
         if new_distance <= _EPSILON:
             raise ValueError(
-                "zoom would produce a non-positive camera distance"
+                "zoom would produce a non-positive "
+                "camera distance"
             )
 
         direction = _vector_scale(
@@ -258,10 +273,18 @@ class AtlasNavigation:
 
     def reset(self) -> None:
         """Restore the Camera to its initial navigation viewpoint."""
-        self._camera.set_position(self._initial_position)
-        self._camera.set_target(self._initial_target)
-        self._camera.set_up(self._initial_up)
-        self._camera.set_projection(self._initial_projection)
+        self._camera.set_position(
+            self._initial_position,
+        )
+        self._camera.set_target(
+            self._initial_target,
+        )
+        self._camera.set_up(
+            self._initial_up,
+        )
+        self._camera.set_projection(
+            self._initial_projection,
+        )
         self._camera.set_field_of_view_degrees(
             self._initial_field_of_view_degrees,
         )
