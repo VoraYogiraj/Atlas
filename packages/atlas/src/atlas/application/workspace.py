@@ -3,6 +3,7 @@ Atlas UI Application Workspace
 
 ENG-040 — Atlas UI Application Shell
 ENG-045 — Atlas Panels
+ENG-046 — Atlas Scene
 """
 
 from __future__ import annotations
@@ -15,6 +16,7 @@ from atlas.application.commands import AtlasCommand
 from atlas.application.panel import AtlasPanel
 from atlas.application.panel_registry import AtlasPanelRegistry
 from atlas.application.queries import AtlasQuery
+from atlas.application.scene import AtlasScene
 from atlas.application.view import AtlasView
 from atlas.application.view_registry import AtlasViewRegistry
 from atlas.core.aid import AtlasID
@@ -51,6 +53,7 @@ class AtlasWorkspace:
         self._active_panel_id: str | None = None
         self._active_view_id: str | None = None
         self._selected_resource_id: AtlasID | None = None
+        self._scene: AtlasScene | None = None
 
         self._lifecycle = "created"
 
@@ -92,6 +95,11 @@ class AtlasWorkspace:
     def selected_resource_id(self) -> AtlasID | None:
         """Return the selected Resource identity."""
         return self._selected_resource_id
+
+    @property
+    def scene(self) -> AtlasScene | None:
+        """Return the hosted 3D Workspace Scene, when configured."""
+        return self._scene
 
     @property
     def lifecycle(self) -> str:
@@ -193,6 +201,25 @@ class AtlasWorkspace:
             view_id,
         )
         self._active_view_id = view_id
+
+    # ------------------------------------------------------------------
+    # Scene hosting
+    # ------------------------------------------------------------------
+
+    def set_scene(
+        self,
+        scene: AtlasScene | None,
+    ) -> None:
+        """Host a framework-independent ENG-046 Scene or clear it."""
+        if scene is not None and not isinstance(
+            scene,
+            AtlasScene,
+        ):
+            raise TypeError(
+                "scene must be an AtlasScene or None"
+            )
+
+        self._scene = scene
 
     # ------------------------------------------------------------------
     # Selection
@@ -314,5 +341,6 @@ class AtlasWorkspace:
         self._active_panel_id = None
         self._active_view_id = None
         self._selected_resource_id = None
+        self._scene = None
 
         self._lifecycle = "disposed"
