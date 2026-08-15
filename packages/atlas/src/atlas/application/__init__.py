@@ -9,6 +9,7 @@ ENG-043 — Atlas Inspector
 ENG-044 — Atlas Toolbar
 ENG-046 — Atlas Scene
 ENG-047 — Atlas Camera
+ENG-048 — Atlas Navigation
 """
 
 from atlas.application.application import AtlasApplication
@@ -35,6 +36,7 @@ from atlas.application.inspector import (
     AtlasInspectorPresentation,
     AtlasInspectorRelationship,
 )
+from atlas.application.navigation import AtlasNavigation
 from atlas.application.panel import AtlasPanel
 from atlas.application.panel_registry import AtlasPanelRegistry
 from atlas.application.presentation import AtlasResourcePresentation
@@ -76,6 +78,9 @@ __all__ = [
 
     # ENG-047 — Camera
     "AtlasCamera",
+
+    # ENG-048 — Navigation
+    "AtlasNavigation",
 
     # ENG-041 — Dashboard
     "AtlasDashboard",
