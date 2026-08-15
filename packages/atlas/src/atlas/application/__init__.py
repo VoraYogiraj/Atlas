@@ -10,6 +10,7 @@ ENG-044 — Atlas Toolbar
 ENG-046 — Atlas Scene
 ENG-047 — Atlas Camera
 ENG-048 — Atlas Navigation
+ENG-049 — Atlas Selection
 """
 
 from atlas.application.application import AtlasApplication
@@ -42,7 +43,10 @@ from atlas.application.panel_registry import AtlasPanelRegistry
 from atlas.application.presentation import AtlasResourcePresentation
 from atlas.application.queries import AtlasQuery
 from atlas.application.scene import AtlasScene, AtlasSceneNode
-from atlas.application.selection import AtlasResourceSelection
+from atlas.application.selection import (
+    AtlasResourceSelection,
+    AtlasSelectionState,
+)
 from atlas.application.toolbar import (
     AtlasToolbar,
     AtlasToolbarItem,
@@ -54,35 +58,24 @@ from atlas.application.view_registry import AtlasViewRegistry
 from atlas.application.views import Atlas3DView
 from atlas.application.workspace import AtlasWorkspace
 
-
 __all__ = [
-    # ENG-039 — Application Boundary
     "AtlasApplication",
     "AtlasCommand",
     "AtlasQuery",
     "AtlasResourceSelection",
+    "AtlasSelectionState",
     "AtlasUIState",
     "AtlasResourcePresentation",
     "Atlas3DView",
-
-    # ENG-040 — UI Application Shell
     "AtlasWorkspace",
     "AtlasPanel",
     "AtlasPanelRegistry",
     "AtlasView",
     "AtlasViewRegistry",
-
-    # ENG-046 — Scene
     "AtlasScene",
     "AtlasSceneNode",
-
-    # ENG-047 — Camera
     "AtlasCamera",
-
-    # ENG-048 — Navigation
     "AtlasNavigation",
-
-    # ENG-041 — Dashboard
     "AtlasDashboard",
     "AtlasDashboardPresentation",
     "AtlasDashboardSelectionTarget",
@@ -91,19 +84,12 @@ __all__ = [
     "AtlasRelationshipSummary",
     "AtlasValidationSummary",
     "AtlasAgentSummary",
-
-    # ENG-042 — Explorer
     "AtlasExplorer",
     "AtlasExplorerNode",
     "AtlasExplorerPresentation",
-
-    # ENG-043 — Inspector
     "AtlasInspector",
-    "AtlasInspectorPresentation",
     "AtlasInspectorRelationship",
     "AtlasInspectorClassification",
-
-    # ENG-044 — Toolbar
     "AtlasToolbar",
     "AtlasToolbarItem",
     "AtlasToolbarPresentation",
