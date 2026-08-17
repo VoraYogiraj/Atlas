@@ -12,6 +12,7 @@ ENG-047 — Atlas Camera
 ENG-048 — Atlas Navigation
 ENG-049 — Atlas Selection
 ENG-050 — Atlas Gizmo
+ENG-051 — Atlas Basic Editing
 """
 
 from atlas.application.application import AtlasApplication
@@ -33,6 +34,7 @@ from atlas.application.explorer import (
     AtlasExplorerPresentation,
 )
 from atlas.application.gizmo import AtlasGizmo
+from atlas.application.basic_editing import AtlasBasicEditing
 from atlas.application.inspector import (
     AtlasInspector,
     AtlasInspectorClassification,
@@ -79,6 +81,7 @@ __all__ = [
     "AtlasCamera",
     "AtlasNavigation",
     "AtlasGizmo",
+    "AtlasBasicEditing",
     "AtlasDashboard",
     "AtlasDashboardPresentation",
     "AtlasDashboardSelectionTarget",
