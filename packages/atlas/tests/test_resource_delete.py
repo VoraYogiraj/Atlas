@@ -25,7 +25,7 @@ from atlas.relationships.relationship import AtlasRelationship
 # ---------------------------------------------------------------------------
 
 
-def make_project() -> AtlasProject:
+def make_project() -> tuple[AtlasProject, AtlasClassification]:
     project = AtlasProject("Delete Test Project")
 
     classification = AtlasClassification(
@@ -35,17 +35,14 @@ def make_project() -> AtlasProject:
 
     project.add_classification(classification)
 
-    return project
+    return project, classification
 
 
 def make_resource(
     project: AtlasProject,
+    classification: AtlasClassification,
     name: str,
 ) -> AtlasResource:
-    classification = project.classifications.get(
-        next(iter(project.classifications))
-    )
-
     resource = AtlasResource(
         classification=classification,
         name=name,
@@ -100,11 +97,12 @@ class TestResourceDeleteCommand:
 
 class TestResourceDeleteApplication:
     def test_delete_existing_resource(self) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
         resource = make_resource(
             project,
+            classification,
             "Wall A",
         )
 
@@ -122,11 +120,12 @@ class TestResourceDeleteApplication:
         assert project.get_resource(resource.aid) is None
 
     def test_delete_decreases_resource_count(self) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
         resource = make_resource(
             project,
+            classification,
             "Wall A",
         )
 
@@ -151,11 +150,20 @@ class TestResourceDeleteApplication:
 
 class TestResourceDeleteRelationshipCleanup:
     def test_delete_removes_outgoing_relationships(self) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
-        resource_a = make_resource(project, "Wall A")
-        resource_b = make_resource(project, "Wall B")
+        resource_a = make_resource(
+            project,
+            classification,
+            "Wall A",
+        )
+
+        resource_b = make_resource(
+            project,
+            classification,
+            "Wall B",
+        )
 
         relationship = AtlasRelationship(
             source=resource_a,
@@ -179,11 +187,20 @@ class TestResourceDeleteRelationshipCleanup:
         assert project.relationship_count == 0
 
     def test_delete_removes_incoming_relationships(self) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
-        resource_a = make_resource(project, "Wall A")
-        resource_b = make_resource(project, "Wall B")
+        resource_a = make_resource(
+            project,
+            classification,
+            "Wall A",
+        )
+
+        resource_b = make_resource(
+            project,
+            classification,
+            "Wall B",
+        )
 
         relationship = AtlasRelationship(
             source=resource_a,
@@ -205,12 +222,26 @@ class TestResourceDeleteRelationshipCleanup:
         assert project.relationship_count == 0
 
     def test_delete_preserves_unrelated_relationships(self) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
-        resource_a = make_resource(project, "Wall A")
-        resource_b = make_resource(project, "Wall B")
-        resource_c = make_resource(project, "Wall C")
+        resource_a = make_resource(
+            project,
+            classification,
+            "Wall A",
+        )
+
+        resource_b = make_resource(
+            project,
+            classification,
+            "Wall B",
+        )
+
+        resource_c = make_resource(
+            project,
+            classification,
+            "Wall C",
+        )
 
         relationship_ab = AtlasRelationship(
             source=resource_a,
@@ -254,11 +285,12 @@ class TestResourceDeleteRelationshipCleanup:
 
 class TestResourceDeleteSpatialCleanup:
     def test_delete_removes_position(self) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
         resource = make_resource(
             project,
+            classification,
             "Wall A",
         )
 
@@ -296,11 +328,12 @@ class TestResourceDeleteSpatialCleanup:
             )
 
     def test_delete_removes_rotation(self) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
         resource = make_resource(
             project,
+            classification,
             "Wall A",
         )
 
@@ -338,11 +371,12 @@ class TestResourceDeleteSpatialCleanup:
             )
 
     def test_delete_removes_scale(self) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
         resource = make_resource(
             project,
+            classification,
             "Wall A",
         )
 
@@ -387,11 +421,20 @@ class TestResourceDeleteSpatialCleanup:
 
 class TestResourceDeleteIsolation:
     def test_delete_one_resource_does_not_delete_another(self) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
-        resource_a = make_resource(project, "Wall A")
-        resource_b = make_resource(project, "Wall B")
+        resource_a = make_resource(
+            project,
+            classification,
+            "Wall A",
+        )
+
+        resource_b = make_resource(
+            project,
+            classification,
+            "Wall B",
+        )
 
         application.execute(
             AtlasCommand(
@@ -408,11 +451,20 @@ class TestResourceDeleteIsolation:
     def test_delete_one_resource_does_not_change_another_position(
         self,
     ) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
-        resource_a = make_resource(project, "Wall A")
-        resource_b = make_resource(project, "Wall B")
+        resource_a = make_resource(
+            project,
+            classification,
+            "Wall A",
+        )
+
+        resource_b = make_resource(
+            project,
+            classification,
+            "Wall B",
+        )
 
         application.execute(
             AtlasCommand(
@@ -455,11 +507,20 @@ class TestResourceDeleteIsolation:
     def test_delete_one_resource_does_not_change_another_rotation(
         self,
     ) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
-        resource_a = make_resource(project, "Wall A")
-        resource_b = make_resource(project, "Wall B")
+        resource_a = make_resource(
+            project,
+            classification,
+            "Wall A",
+        )
+
+        resource_b = make_resource(
+            project,
+            classification,
+            "Wall B",
+        )
 
         application.execute(
             AtlasCommand(
@@ -502,11 +563,20 @@ class TestResourceDeleteIsolation:
     def test_delete_one_resource_does_not_change_another_scale(
         self,
     ) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
-        resource_a = make_resource(project, "Wall A")
-        resource_b = make_resource(project, "Wall B")
+        resource_a = make_resource(
+            project,
+            classification,
+            "Wall A",
+        )
+
+        resource_b = make_resource(
+            project,
+            classification,
+            "Wall B",
+        )
 
         application.execute(
             AtlasCommand(
@@ -554,7 +624,7 @@ class TestResourceDeleteIsolation:
 
 class TestResourceDeleteUnknownResource:
     def test_delete_unknown_resource_fails(self) -> None:
-        project = make_project()
+        project, _classification = make_project()
         application = make_application(project)
 
         unknown_id = AtlasID.generate()
@@ -572,11 +642,12 @@ class TestResourceDeleteUnknownResource:
     def test_delete_unknown_resource_does_not_mutate_project(
         self,
     ) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
         resource = make_resource(
             project,
+            classification,
             "Wall A",
         )
 
@@ -607,11 +678,12 @@ class TestResourceDeleteUnknownResource:
 
 class TestResourceDeleteValidation:
     def test_delete_rejects_non_atlas_id(self) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
         resource = make_resource(
             project,
+            classification,
             "Wall A",
         )
 
@@ -638,11 +710,12 @@ class TestResourceDeleteValidation:
 
 class TestResourceDeleteRepeated:
     def test_second_delete_fails(self) -> None:
-        project = make_project()
+        project, classification = make_project()
         application = make_application(project)
 
         resource = make_resource(
             project,
+            classification,
             "Wall A",
         )
 
