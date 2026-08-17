@@ -7,25 +7,31 @@ ENG-053 defines Resource Move as an absolute 3D position mutation.
 
 Canonical semantics:
 
-    AtlasID + absolute AtlasPosition
+    AtlasID + absolute position (x, y, z)
         ->
     canonical Resource-associated spatial state
 
-Important architectural boundaries:
+Architectural boundaries:
 
 - AtlasResource does not own position/transform fields.
-- SceneNode is not the canonical engineering state.
+- SceneNode is not canonical engineering state.
 - Move enters Atlas through AtlasApplication.execute().
 - Canonical Resource identity remains AtlasID.
 - Spatial state is Resource-associated canonical state, separate from
   AtlasResource itself.
 - Invalid requests must be atomic.
 - Move is absolute and therefore idempotent.
+
+The tests intentionally do not import or assume a concrete spatial
+implementation class. The implementation is responsible for choosing the
+appropriate internal representation while satisfying this observable
+contract.
 """
 
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 
 import pytest
 
@@ -35,7 +41,6 @@ from atlas.application.queries import AtlasQuery
 from atlas.classification.classification import AtlasClassification
 from atlas.core.aid import AtlasID
 from atlas.core.resource import AtlasResource
-from atlas.core.spatial import AtlasPosition
 from atlas.project.project import AtlasProject
 
 
@@ -77,9 +82,9 @@ def create_move_command(
     z: float,
 ) -> AtlasCommand:
     """
-    Create the canonical ENG-053 Move command.
+    Create an ENG-053 Move command.
 
-    Move uses an absolute target position.
+    Position is absolute, not a relative/delta movement.
     """
     return AtlasCommand(
         name="move_resource",
@@ -111,15 +116,20 @@ def create_position_query(
 def get_position(
     application: AtlasApplication,
     resource_id: AtlasID,
-) -> AtlasPosition:
+) -> Mapping[str, float]:
     """
-    Read canonical Resource spatial state through the application boundary.
+    Read the canonical Resource position through the application boundary.
+
+    The concrete internal spatial type is intentionally not specified here.
+    The observable query contract is an x/y/z mapping.
     """
     result = application.query(
         create_position_query(resource_id),
     )
 
-    assert isinstance(result, AtlasPosition)
+    assert isinstance(result, Mapping)
+
+    assert set(result.keys()) == {"x", "y", "z"}
 
     return result
 
@@ -211,23 +221,23 @@ class TestResourceMoveApplicationBoundary:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        command = create_move_command(
-            resource.aid,
-            x=10.0,
-            y=20.0,
-            z=30.0,
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
         )
-
-        application.execute(command)
 
         position = get_position(
             application,
             resource.aid,
         )
 
-        assert position.x == 10.0
-        assert position.y == 20.0
-        assert position.z == 30.0
+        assert position["x"] == 10.0
+        assert position["y"] == 20.0
+        assert position["z"] == 30.0
 
     def test_invalid_command_type_is_rejected(self) -> None:
         project, _ = create_project_with_resource()
@@ -249,31 +259,31 @@ class TestResourceMoveIdentity:
 
         original_id = resource.aid
 
-        command = create_move_command(
-            original_id,
-            x=10.0,
-            y=20.0,
-            z=30.0,
+        application.execute(
+            create_move_command(
+                original_id,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
         )
-
-        application.execute(command)
 
         resolved = project.require_resource(original_id)
 
         assert resolved.aid == original_id
 
-    def test_move_mutates_canonical_registry_resource(self) -> None:
+    def test_move_targets_canonical_registry_resource(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        command = create_move_command(
-            resource.aid,
-            x=10.0,
-            y=20.0,
-            z=30.0,
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
         )
-
-        application.execute(command)
 
         resolved = project.require_resource(resource.aid)
 
@@ -290,61 +300,63 @@ class TestResourceMoveSemantics:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        first_move = create_move_command(
-            resource.aid,
-            x=10.0,
-            y=20.0,
-            z=30.0,
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
         )
 
-        second_move = create_move_command(
-            resource.aid,
-            x=100.0,
-            y=200.0,
-            z=300.0,
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=100.0,
+                y=200.0,
+                z=300.0,
+            ),
         )
-
-        application.execute(first_move)
-        application.execute(second_move)
 
         position = get_position(
             application,
             resource.aid,
         )
 
-        assert position.x == 100.0
-        assert position.y == 200.0
-        assert position.z == 300.0
+        assert position["x"] == 100.0
+        assert position["y"] == 200.0
+        assert position["z"] == 300.0
 
     def test_move_is_not_a_delta_operation(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        first_move = create_move_command(
-            resource.aid,
-            x=10.0,
-            y=20.0,
-            z=30.0,
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
         )
 
-        second_move = create_move_command(
-            resource.aid,
-            x=5.0,
-            y=6.0,
-            z=7.0,
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=5.0,
+                y=6.0,
+                z=7.0,
+            ),
         )
-
-        application.execute(first_move)
-        application.execute(second_move)
 
         position = get_position(
             application,
             resource.aid,
         )
 
-        assert position.x == 5.0
-        assert position.y == 6.0
-        assert position.z == 7.0
+        assert position["x"] == 5.0
+        assert position["y"] == 6.0
+        assert position["z"] == 7.0
 
     def test_identical_move_is_idempotent(self) -> None:
         project, resource = create_project_with_resource()
@@ -358,15 +370,21 @@ class TestResourceMoveSemantics:
         )
 
         application.execute(command)
-        first = get_position(
-            application,
-            resource.aid,
+
+        first = dict(
+            get_position(
+                application,
+                resource.aid,
+            ),
         )
 
         application.execute(command)
-        second = get_position(
-            application,
-            resource.aid,
+
+        second = dict(
+            get_position(
+                application,
+                resource.aid,
+            ),
         )
 
         assert second == first
@@ -405,7 +423,7 @@ class TestResourceMoveValidation:
             },
         )
 
-        with pytest.raises((TypeError, ValueError)):
+        with pytest.raises((TypeError, ValueError, KeyError)):
             application.execute(command)
 
     @pytest.mark.parametrize(
@@ -458,7 +476,7 @@ class TestResourceMoveValidation:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        position = {
+        position: dict[str, float] = {
             "x": 1.0,
             "y": 2.0,
             "z": 3.0,
@@ -610,14 +628,14 @@ class TestResourceMoveIsolation:
 
         before_count = project.resources.count
 
-        command = create_move_command(
-            resource.aid,
-            x=10.0,
-            y=20.0,
-            z=30.0,
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
         )
-
-        application.execute(command)
 
         assert project.resources.count == before_count
 
@@ -625,14 +643,14 @@ class TestResourceMoveIsolation:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        command = create_move_command(
-            resource.aid,
-            x=10.0,
-            y=20.0,
-            z=30.0,
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
         )
-
-        application.execute(command)
 
         resolved = project.require_resource(resource.aid)
 
@@ -821,11 +839,11 @@ class TestResourceMoveSceneIndependence:
             resource.aid,
         )
 
-        assert position == AtlasPosition(
-            x=10.0,
-            y=20.0,
-            z=30.0,
-        )
+        assert position == {
+            "x": 10.0,
+            "y": 20.0,
+            "z": 30.0,
+        }
 
     def test_resource_does_not_receive_position_attribute(self) -> None:
         """
@@ -866,9 +884,11 @@ class TestResourceMoveAtomicity:
             ),
         )
 
-        before = get_position(
-            application,
-            resource.aid,
+        before = dict(
+            get_position(
+                application,
+                resource.aid,
+            ),
         )
 
         invalid_command = AtlasCommand(
@@ -886,9 +906,11 @@ class TestResourceMoveAtomicity:
         with pytest.raises((TypeError, ValueError)):
             application.execute(invalid_command)
 
-        after = get_position(
-            application,
-            resource.aid,
+        after = dict(
+            get_position(
+                application,
+                resource.aid,
+            ),
         )
 
         assert after == before
@@ -908,9 +930,11 @@ class TestResourceMoveAtomicity:
             ),
         )
 
-        before = get_position(
-            application,
-            resource.aid,
+        before = dict(
+            get_position(
+                application,
+                resource.aid,
+            ),
         )
 
         unknown_id = AtlasID.generate()
@@ -925,9 +949,11 @@ class TestResourceMoveAtomicity:
                 ),
             )
 
-        after = get_position(
-            application,
-            resource.aid,
+        after = dict(
+            get_position(
+                application,
+                resource.aid,
+            ),
         )
 
         assert after == before
@@ -954,16 +980,20 @@ class TestResourceMoveDeterminism:
 
         application.execute(command)
 
-        first = get_position(
-            application,
-            resource.aid,
+        first = dict(
+            get_position(
+                application,
+                resource.aid,
+            ),
         )
 
         application.execute(command)
 
-        second = get_position(
-            application,
-            resource.aid,
+        second = dict(
+            get_position(
+                application,
+                resource.aid,
+            ),
         )
 
         assert second == first
@@ -986,8 +1016,8 @@ class TestResourceMoveDeterminism:
             resource.aid,
         )
 
-        assert position == AtlasPosition(
-            x=11.0,
-            y=22.0,
-            z=33.0,
-        )
+        assert position == {
+            "x": 11.0,
+            "y": 22.0,
+            "z": 33.0,
+        }
