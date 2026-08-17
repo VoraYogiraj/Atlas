@@ -1,7 +1,7 @@
 """
 ENG-053 — Atlas Resource Move
 
-RED-phase contract tests.
+RED/GREEN-phase contract tests.
 
 ENG-053 defines Resource Move as an absolute 3D position mutation.
 
@@ -104,10 +104,12 @@ def create_position_query(
 ) -> AtlasQuery:
     """
     Query the canonical spatial state associated with a Resource.
+
+    AtlasQuery uses `parameters`, not `payload`.
     """
     return AtlasQuery(
         name="get_resource_position",
-        payload={
+        parameters={
             "resource_id": resource_id,
         },
     )
@@ -164,7 +166,10 @@ class TestResourceMoveCommand:
         )
 
         assert command.payload["resource_id"] == resource.aid
-        assert isinstance(command.payload["resource_id"], AtlasID)
+        assert isinstance(
+            command.payload["resource_id"],
+            AtlasID,
+        )
 
     def test_move_command_contains_absolute_position(self) -> None:
         _, resource = create_project_with_resource()
@@ -268,7 +273,9 @@ class TestResourceMoveIdentity:
             ),
         )
 
-        resolved = project.require_resource(original_id)
+        resolved = project.require_resource(
+            original_id
+        )
 
         assert resolved.aid == original_id
 
@@ -285,7 +292,9 @@ class TestResourceMoveIdentity:
             ),
         )
 
-        resolved = project.require_resource(resource.aid)
+        resolved = project.require_resource(
+            resource.aid
+        )
 
         assert resolved is resource
 
@@ -423,7 +432,9 @@ class TestResourceMoveValidation:
             },
         )
 
-        with pytest.raises((TypeError, ValueError, KeyError)):
+        with pytest.raises(
+            (TypeError, ValueError, KeyError)
+        ):
             application.execute(command)
 
     @pytest.mark.parametrize(
@@ -453,7 +464,9 @@ class TestResourceMoveValidation:
             },
         )
 
-        with pytest.raises((TypeError, ValueError)):
+        with pytest.raises(
+            (TypeError, ValueError)
+        ):
             application.execute(command)
 
     @pytest.mark.parametrize(
@@ -492,7 +505,9 @@ class TestResourceMoveValidation:
             },
         )
 
-        with pytest.raises((TypeError, ValueError)):
+        with pytest.raises(
+            (TypeError, ValueError)
+        ):
             application.execute(command)
 
     @pytest.mark.parametrize(
@@ -520,7 +535,9 @@ class TestResourceMoveValidation:
             },
         )
 
-        with pytest.raises((TypeError, ValueError)):
+        with pytest.raises(
+            (TypeError, ValueError)
+        ):
             application.execute(command)
 
     def test_missing_resource_id_is_rejected(self) -> None:
@@ -538,7 +555,9 @@ class TestResourceMoveValidation:
             },
         )
 
-        with pytest.raises((TypeError, ValueError, KeyError)):
+        with pytest.raises(
+            (TypeError, ValueError, KeyError)
+        ):
             application.execute(command)
 
     @pytest.mark.parametrize(
@@ -569,7 +588,9 @@ class TestResourceMoveValidation:
             },
         )
 
-        with pytest.raises((TypeError, ValueError)):
+        with pytest.raises(
+            (TypeError, ValueError)
+        ):
             application.execute(command)
 
 
@@ -592,10 +613,14 @@ class TestResourceMoveMissingResource:
             z=30.0,
         )
 
-        with pytest.raises((KeyError, ValueError)):
+        with pytest.raises(
+            (KeyError, ValueError)
+        ):
             application.execute(command)
 
-    def test_unknown_resource_does_not_create_resource(self) -> None:
+    def test_unknown_resource_does_not_create_resource(
+        self,
+    ) -> None:
         project, _ = create_project_with_resource()
         application = AtlasApplication(project)
 
@@ -610,7 +635,9 @@ class TestResourceMoveMissingResource:
             z=30.0,
         )
 
-        with pytest.raises((KeyError, ValueError)):
+        with pytest.raises(
+            (KeyError, ValueError)
+        ):
             application.execute(command)
 
         assert project.resources.count == before_count
@@ -652,7 +679,9 @@ class TestResourceMoveIsolation:
             ),
         )
 
-        resolved = project.require_resource(resource.aid)
+        resolved = project.require_resource(
+            resource.aid
+        )
 
         assert resolved is resource
 
@@ -845,7 +874,9 @@ class TestResourceMoveSceneIndependence:
             "z": 30.0,
         }
 
-    def test_resource_does_not_receive_position_attribute(self) -> None:
+    def test_resource_does_not_receive_position_attribute(
+        self,
+    ) -> None:
         """
         ENG-053 must not put spatial state directly on AtlasResource.
         """
@@ -861,8 +892,15 @@ class TestResourceMoveSceneIndependence:
             ),
         )
 
-        assert not hasattr(resource, "position")
-        assert not hasattr(resource, "transform")
+        assert not hasattr(
+            resource,
+            "position",
+        )
+
+        assert not hasattr(
+            resource,
+            "transform",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -871,7 +909,9 @@ class TestResourceMoveSceneIndependence:
 
 
 class TestResourceMoveAtomicity:
-    def test_invalid_move_preserves_existing_position(self) -> None:
+    def test_invalid_move_preserves_existing_position(
+        self,
+    ) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
@@ -903,8 +943,12 @@ class TestResourceMoveAtomicity:
             },
         )
 
-        with pytest.raises((TypeError, ValueError)):
-            application.execute(invalid_command)
+        with pytest.raises(
+            (TypeError, ValueError)
+        ):
+            application.execute(
+                invalid_command
+            )
 
         after = dict(
             get_position(
@@ -939,7 +983,9 @@ class TestResourceMoveAtomicity:
 
         unknown_id = AtlasID.generate()
 
-        with pytest.raises((KeyError, ValueError)):
+        with pytest.raises(
+            (KeyError, ValueError)
+        ):
             application.execute(
                 create_move_command(
                     unknown_id,
@@ -998,7 +1044,9 @@ class TestResourceMoveDeterminism:
 
         assert second == first
 
-    def test_move_result_does_not_depend_on_scene_state(self) -> None:
+    def test_move_result_does_not_depend_on_scene_state(
+        self,
+    ) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
