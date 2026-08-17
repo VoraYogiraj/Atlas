@@ -1,6 +1,6 @@
 # ENG-050 — Atlas Gizmo
 
-**Status:** Proposed  
+**Status:** Complete  
 **Phase:** Phase 10 — 3D Workspace  
 **Depends On:** ENG-039, ENG-040, ENG-045, ENG-046, ENG-047, ENG-048, ENG-049  
 **Previous:** ENG-049 — Atlas Selection  

@@ -1,6 +1,6 @@
 ENG-051 — Atlas Basic Editing
 Phase: 10 — 3D Workspace
-Status: Proposed / Specification Draft
+Status: Complete
 Depends On: ENG-039, ENG-040, ENG-045, ENG-046, ENG-047, ENG-048, ENG-049, ENG-050
 Previous: ENG-050 — Gizmos
 Next: TBD
