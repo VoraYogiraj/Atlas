@@ -16,7 +16,7 @@ from atlas.application.presentation import AtlasResourcePresentation
 from atlas.application.queries import AtlasQuery
 from atlas.classification.classification import AtlasClassification
 from atlas.project.project import AtlasProject
-from atlas.resource.resource import AtlasResource
+from atlas.core.resource import AtlasResource
 
 
 class AtlasApplication:
