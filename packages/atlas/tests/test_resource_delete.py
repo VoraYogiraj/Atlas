@@ -29,6 +29,7 @@ def make_project() -> AtlasProject:
     project = AtlasProject("Delete Test Project")
 
     classification = AtlasClassification(
+        id=AtlasID.generate(),
         name="Wall",
     )
 
