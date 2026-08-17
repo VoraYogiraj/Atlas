@@ -9,10 +9,6 @@ Provides the project-level container that owns:
     - Classification hierarchy
     - Canonical Resource spatial state
 
-A Project defines the boundary within which Resources,
-Classifications, Relationships, and canonical Resource spatial
-state are considered valid.
-
 Specifications:
     ENG-001 — Project
     ENG-008 — Resource Registry
@@ -22,6 +18,7 @@ Specifications:
     ENG-019 — Project Classification Integrity
     ENG-022 — Project Relationship Queries
     ENG-053 — Atlas Resource Move
+    ENG-054 — Atlas Resource Rotate
 """
 
 from __future__ import annotations
@@ -35,6 +32,7 @@ from atlas.core.aid import AtlasID
 from atlas.core.resource import AtlasResource
 from atlas.core.spatial import (
     AtlasSpatialPosition,
+    AtlasSpatialRotation,
     AtlasSpatialStateRegistry,
 )
 from atlas.graph.graph import AtlasResourceGraph
@@ -50,15 +48,8 @@ class AtlasProject:
     Classification Registry, Classification Hierarchy,
     and canonical spatial state registry.
 
-    Resources and Classifications are project-scoped. A Resource
-    cannot be added to a Project unless its Classification is also
-    registered with that Project.
-
-    Relationships are managed by the Project's Resource Graph and
-    therefore both endpoint Resources must belong to the Project.
-
-    Canonical spatial state is stored separately from AtlasResource
-    and is keyed by the Resource's immutable AtlasID.
+    Spatial state is separate from AtlasResource and is keyed by
+    canonical AtlasID.
     """
 
     def __init__(
@@ -91,8 +82,6 @@ class AtlasProject:
 
         self._resources = AtlasResourceRegistry()
 
-        # ENG-053:
-        # Canonical spatial state remains separate from AtlasResource.
         self._spatial_states = (
             AtlasSpatialStateRegistry()
         )
@@ -124,11 +113,7 @@ class AtlasProject:
 
     @property
     def id(self) -> AtlasID:
-        """
-        Alias for the Project ID.
-
-        Kept for consistency with other Atlas domain objects.
-        """
+        """Alias for the Project ID."""
         return self._aid
 
     # ------------------------------------------------------------------
@@ -145,7 +130,6 @@ class AtlasProject:
         self,
         value: str,
     ) -> None:
-        """Set the Project name."""
         if not isinstance(
             value,
             str,
@@ -167,12 +151,7 @@ class AtlasProject:
 
     @property
     def metadata(self) -> dict[str, Any]:
-        """
-        Return the Project metadata dictionary.
-
-        The actual internal dictionary is returned so callers can
-        update Project metadata through the public API.
-        """
+        """Return Project metadata."""
         return self._metadata
 
     # ------------------------------------------------------------------
@@ -181,22 +160,18 @@ class AtlasProject:
 
     @property
     def resources(self) -> AtlasResourceRegistry:
-        """
-        Return the Resource Registry owned by this Project.
-        """
+        """Return the canonical Resource Registry."""
         return self._resources
 
     @property
     def resource_registry(
         self,
     ) -> AtlasResourceRegistry:
-        """
-        Alias for the Project Resource Registry.
-        """
+        """Alias for the canonical Resource Registry."""
         return self._resources
 
     # ------------------------------------------------------------------
-    # Spatial State Registry
+    # Spatial State
     # ------------------------------------------------------------------
 
     @property
@@ -204,10 +179,7 @@ class AtlasProject:
         self,
     ) -> AtlasSpatialStateRegistry:
         """
-        Return the canonical spatial state registry owned by this Project.
-
-        Spatial state is keyed by AtlasID and is intentionally separate
-        from AtlasResource.
+        Return the Project-owned canonical spatial state registry.
         """
         return self._spatial_states
 
@@ -217,18 +189,14 @@ class AtlasProject:
 
     @property
     def graph(self) -> AtlasResourceGraph:
-        """
-        Return the Resource Graph owned by this Project.
-        """
+        """Return the Resource Graph."""
         return self._graph
 
     @property
     def resource_graph(
         self,
     ) -> AtlasResourceGraph:
-        """
-        Alias for the Project Resource Graph.
-        """
+        """Alias for the Resource Graph."""
         return self._graph
 
     # ------------------------------------------------------------------
@@ -239,18 +207,14 @@ class AtlasProject:
     def classifications(
         self,
     ) -> AtlasClassificationRegistry:
-        """
-        Return the Classification Registry owned by this Project.
-        """
+        """Return the Classification Registry."""
         return self._classifications
 
     @property
     def classification_registry(
         self,
     ) -> AtlasClassificationRegistry:
-        """
-        Alias for the Project Classification Registry.
-        """
+        """Alias for the Classification Registry."""
         return self._classifications
 
     # ------------------------------------------------------------------
@@ -261,9 +225,7 @@ class AtlasProject:
     def classification_hierarchy(
         self,
     ) -> AtlasClassificationHierarchy:
-        """
-        Return the Classification Hierarchy owned by this Project.
-        """
+        """Return the Classification Hierarchy."""
         return self._classification_hierarchy
 
     # ------------------------------------------------------------------
@@ -274,20 +236,6 @@ class AtlasProject:
         self,
         classification: AtlasClassification,
     ) -> AtlasClassification:
-        """
-        Register a Classification with this Project.
-
-        The Classification is registered in both the canonical
-        Classification Registry and the Classification Hierarchy.
-
-        Parent Classifications must already be registered with this
-        Project.
-
-        Returns
-        -------
-        AtlasClassification
-            The registered Classification.
-        """
         if not isinstance(
             classification,
             AtlasClassification,
@@ -306,8 +254,6 @@ class AtlasProject:
                 f"{classification_id}"
             )
 
-        # Register in the hierarchy first. This validates the
-        # parent relationship before changing the registry.
         self._classification_hierarchy.add(
             classification
         )
@@ -317,9 +263,7 @@ class AtlasProject:
                 classification
             )
         except Exception:
-            # Keep hierarchy and registry synchronized if registration
-            # unexpectedly fails.
-            self._classification_hierarchy.remove(
+            self._classifications.remove(
                 classification_id
             )
             raise
@@ -330,11 +274,6 @@ class AtlasProject:
         self,
         classification_id: str,
     ) -> AtlasClassification | None:
-        """
-        Return a Project Classification by ID.
-
-        Returns None when not registered.
-        """
         return self._classifications.get(
             classification_id
         )
@@ -343,11 +282,6 @@ class AtlasProject:
         self,
         classification_id: str,
     ) -> AtlasClassification:
-        """
-        Return a required Project Classification.
-
-        Raises KeyError when the Classification is not registered.
-        """
         return self._classifications.require(
             classification_id
         )
@@ -356,19 +290,6 @@ class AtlasProject:
         self,
         classification_id: str,
     ) -> AtlasClassification | None:
-        """
-        Remove a Classification from this Project.
-
-        A Classification cannot be removed when:
-
-            - it has registered child Classifications
-            - it is currently used by a registered Resource
-
-        Returns
-        -------
-        AtlasClassification | None
-            The removed Classification, or None when not registered.
-        """
         classification = self._classifications.get(
             classification_id
         )
@@ -376,7 +297,6 @@ class AtlasProject:
         if classification is None:
             return None
 
-        # A classification with children cannot be removed.
         children = self._classification_hierarchy.children(
             classification
         )
@@ -387,8 +307,6 @@ class AtlasProject:
                 f"{classification_id}"
             )
 
-        # A classification currently used by a Resource cannot
-        # be removed.
         for resource in self._resources:
             if resource.classification.id == classification_id:
                 raise ValueError(
@@ -396,7 +314,6 @@ class AtlasProject:
                     f"Resource: {classification_id}"
                 )
 
-        # Remove from hierarchy first.
         removed = self._classification_hierarchy.remove(
             classification_id
         )
@@ -409,7 +326,6 @@ class AtlasProject:
                 classification_id
             )
         except Exception:
-            # Restore hierarchy if registry removal unexpectedly fails.
             self._classification_hierarchy.add(
                 classification
             )
@@ -419,22 +335,42 @@ class AtlasProject:
     # Resource Management
     # ------------------------------------------------------------------
 
+    def _initialize_spatial_state(
+        self,
+        resource: AtlasResource,
+    ) -> None:
+        """
+        Initialize the complete canonical spatial state for a Resource.
+
+        Both ENG-053 position and ENG-054 rotation start at origin/zero.
+        """
+        self._spatial_states.set_position(
+            resource.aid,
+            AtlasSpatialPosition(
+                x=0.0,
+                y=0.0,
+                z=0.0,
+            ),
+        )
+
+        self._spatial_states.set_rotation(
+            resource.aid,
+            AtlasSpatialRotation(
+                x=0.0,
+                y=0.0,
+                z=0.0,
+            ),
+        )
+
     def add_resource(
         self,
         resource: AtlasResource,
     ) -> AtlasResource:
         """
-        Add a Resource to this Project.
+        Add a Resource through the Project-integrity boundary.
 
-        The Resource's Classification must already be registered
-        with this Project.
-
-        A canonical spatial state entry is created at the origin.
-
-        This API preserves Project Classification Integrity.
-        ENG-052 Resource creation intentionally does not use this
-        method when the supplied Classification has not yet been
-        registered.
+        The Resource Classification must already be registered with
+        this Project.
         """
         if not isinstance(
             resource,
@@ -444,7 +380,9 @@ class AtlasProject:
                 "resource must be an AtlasResource"
             )
 
-        classification_id = resource.classification.id
+        classification_id = (
+            resource.classification.id
+        )
 
         if not self._classifications.contains(
             classification_id
@@ -458,13 +396,8 @@ class AtlasProject:
             resource
         )
 
-        self._spatial_states.set_position(
-            resource.aid,
-            AtlasSpatialPosition(
-                x=0.0,
-                y=0.0,
-                z=0.0,
-            ),
+        self._initialize_spatial_state(
+            resource
         )
 
         return resource
@@ -476,15 +409,12 @@ class AtlasProject:
         """
         Return a Resource by identifier.
 
-        Returns None when the Resource is not registered.
+        Missing identifiers return None.
 
-        This lookup intentionally preserves the existing permissive
-        Registry semantics. Read-oriented callers and Agents may pass
-        an unknown or non-AtlasID identifier and receive None rather
-        than a type-validation failure.
-
-        Strict AtlasID validation belongs at boundaries that require
-        canonical engineering identity, such as Resource Move.
+        This method intentionally remains permissive for established
+        Registry/Agent read semantics. Strict canonical identity
+        validation belongs to callers that explicitly require AtlasID,
+        such as Resource Move and Resource Rotate.
         """
         return self._resources.get(
             aid
@@ -497,7 +427,7 @@ class AtlasProject:
         """
         Return a required Resource.
 
-        Raises KeyError when the Resource is not registered.
+        Strictly requires AtlasID.
         """
         if not isinstance(
             aid,
@@ -516,18 +446,7 @@ class AtlasProject:
         resource: AtlasResource,
     ) -> AtlasResource | None:
         """
-        Remove a Resource from this Project.
-
-        Any Relationships involving the Resource are removed from
-        the Project Graph first.
-
-        Canonical spatial state associated with the Resource is also
-        removed.
-
-        Returns
-        -------
-        AtlasResource | None
-            The removed Resource, or None if it is not registered.
+        Remove a Resource and all associated canonical spatial state.
         """
         if not isinstance(
             resource,
@@ -572,13 +491,6 @@ class AtlasProject:
         self,
         classification_id: str,
     ) -> list[AtlasResource]:
-        """
-        Return Resources belonging to a Classification.
-
-        Matching is performed using Classification ID.
-
-        Resources are returned in Resource Registry order.
-        """
         if not isinstance(
             classification_id,
             str,
@@ -607,16 +519,6 @@ class AtlasProject:
         self,
         relationship: AtlasRelationship,
     ) -> AtlasRelationship:
-        """
-        Add a Relationship to this Project.
-
-        Both endpoint Resources must already belong to this Project.
-
-        Returns
-        -------
-        AtlasRelationship
-            The same Relationship instance that was registered.
-        """
         if not isinstance(
             relationship,
             AtlasRelationship,
@@ -632,20 +534,13 @@ class AtlasProject:
         return relationship
 
     # ------------------------------------------------------------------
-    # ENG-022 — Project Relationship Queries
+    # Relationship Queries
     # ------------------------------------------------------------------
 
     def relationships_for_resource(
         self,
         resource: AtlasResource,
     ) -> list[AtlasRelationship]:
-        """
-        Return all Relationships involving a Resource.
-
-        Relationship direction is ignored.
-
-        The Resource must belong to this Project.
-        """
         return self._graph.for_resource(
             resource
         )
@@ -654,14 +549,6 @@ class AtlasProject:
         self,
         resource: AtlasResource,
     ) -> list[AtlasRelationship]:
-        """
-        Return Relationships originating from a Resource.
-
-        Only Relationships where the Resource is the source
-        are returned.
-
-        The Resource must belong to this Project.
-        """
         return self._graph.outgoing(
             resource
         )
@@ -670,14 +557,6 @@ class AtlasProject:
         self,
         resource: AtlasResource,
     ) -> list[AtlasRelationship]:
-        """
-        Return Relationships terminating at a Resource.
-
-        Only Relationships where the Resource is the target
-        are returned.
-
-        The Resource must belong to this Project.
-        """
         return self._graph.incoming(
             resource
         )
@@ -686,11 +565,6 @@ class AtlasProject:
         self,
         relationship_type: str,
     ) -> list[AtlasRelationship]:
-        """
-        Return all Relationships of a specific type.
-
-        Registration order is preserved.
-        """
         return self._graph.for_relationship_type(
             relationship_type
         )
@@ -703,12 +577,6 @@ class AtlasProject:
         self,
         relationship: AtlasRelationship,
     ) -> AtlasRelationship | None:
-        """
-        Remove a Relationship from this Project.
-
-        Returns the removed Relationship, or None if it is
-        not registered.
-        """
         return self._graph.remove_relationship(
             relationship
         )
@@ -719,12 +587,10 @@ class AtlasProject:
 
     @property
     def resource_count(self) -> int:
-        """Return the number of Resources in this Project."""
         return self._resources.count
 
     @property
     def relationship_count(self) -> int:
-        """Return the number of Relationships in this Project."""
         return self._graph.count
 
     # ------------------------------------------------------------------
@@ -732,7 +598,6 @@ class AtlasProject:
     # ------------------------------------------------------------------
 
     def __len__(self) -> int:
-        """Return the number of Resources in the Project."""
         return self._resources.count
 
     # ------------------------------------------------------------------

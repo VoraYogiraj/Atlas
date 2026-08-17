@@ -4,6 +4,7 @@ Atlas Application Boundary
 ENG-039 — Atlas UI Architecture
 ENG-052 — Atlas Resource Create
 ENG-053 — Atlas Resource Move
+ENG-054 — Atlas Resource Rotate
 
 Thin application boundary between UI interactions and the canonical
 Atlas domain model.
@@ -17,7 +18,10 @@ from atlas.application.commands import AtlasCommand
 from atlas.application.presentation import AtlasResourcePresentation
 from atlas.application.queries import AtlasQuery
 from atlas.core.aid import AtlasID
-from atlas.core.spatial import AtlasSpatialPosition
+from atlas.core.spatial import (
+    AtlasSpatialPosition,
+    AtlasSpatialRotation,
+)
 from atlas.project.project import AtlasProject
 
 
@@ -59,8 +63,8 @@ class AtlasApplication:
         """
         Execute an application command.
 
-        The application layer remains a thin boundary over the canonical
-        Project and its domain-owned registries/state.
+        Commands express intent. Canonical state remains owned by
+        AtlasProject and its domain structures.
         """
         if not isinstance(
             command,
@@ -108,28 +112,29 @@ class AtlasApplication:
                 name=name,
             )
 
-            # ENG-052 canonical creation semantics:
+            # Preserve the completed ENG-052 creation contract.
             #
-            # Resource creation registers directly with the canonical
-            # Resource Registry.
-            #
-            # Do NOT route this through AtlasProject.add_resource().
-            # add_resource() intentionally requires the Resource's
-            # Classification to already be registered with the Project.
-            #
-            # ENG-052 permits creation using the supplied Classification
-            # object without first registering that Classification.
+            # Resource Create registers directly in the canonical
+            # Resource Registry and does not require the supplied
+            # Classification to be pre-registered with the Project.
             self._project.resources.register(
                 resource
             )
 
-            # ENG-053 integration:
-            #
-            # Initialize Resource-associated canonical spatial state
-            # independently of AtlasResource itself.
+            # ENG-053 spatial initialization.
             self._project.spatial_states.set_position(
                 resource.aid,
                 AtlasSpatialPosition(
+                    x=0.0,
+                    y=0.0,
+                    z=0.0,
+                ),
+            )
+
+            # ENG-054 spatial initialization.
+            self._project.spatial_states.set_rotation(
+                resource.aid,
+                AtlasSpatialRotation(
                     x=0.0,
                     y=0.0,
                     z=0.0,
@@ -155,7 +160,6 @@ class AtlasApplication:
                     "resource_id must be an AtlasID"
                 )
 
-            # Resolve the canonical Resource first.
             self._project.require_resource(
                 resource_id
             )
@@ -187,14 +191,69 @@ class AtlasApplication:
                 z=position["z"],
             )
 
-            # Mutation occurs only after Resource resolution and complete
-            # position validation have succeeded.
+            # Validation is complete before mutation.
             self._project.spatial_states.set_position(
                 resource_id,
                 spatial_position,
             )
 
             return spatial_position.as_mapping()
+
+        # --------------------------------------------------------------
+        # ENG-054 — Resource Rotate
+        # --------------------------------------------------------------
+
+        if command.name == "rotate_resource":
+            resource_id = command.payload.get(
+                "resource_id"
+            )
+
+            if not isinstance(
+                resource_id,
+                AtlasID,
+            ):
+                raise TypeError(
+                    "resource_id must be an AtlasID"
+                )
+
+            self._project.require_resource(
+                resource_id
+            )
+
+            rotation = command.payload.get(
+                "rotation"
+            )
+
+            if not isinstance(
+                rotation,
+                dict,
+            ):
+                raise TypeError(
+                    "rotation must be a dictionary"
+                )
+
+            if set(rotation.keys()) != {
+                "x",
+                "y",
+                "z",
+            }:
+                raise ValueError(
+                    "rotation must contain exactly x, y, and z"
+                )
+
+            spatial_rotation = AtlasSpatialRotation(
+                x=rotation["x"],
+                y=rotation["y"],
+                z=rotation["z"],
+            )
+
+            # Validation is complete before mutation.
+            self._project.spatial_states.set_rotation(
+                resource_id,
+                spatial_rotation,
+            )
+
+            return spatial_rotation.as_mapping()
 
         raise NotImplementedError(
             f"Command '{command.name}' is not implemented"
@@ -211,8 +270,7 @@ class AtlasApplication:
         """
         Execute an application query.
 
-        The application boundary remains thin and delegates canonical
-        state lookup to AtlasProject-owned structures.
+        Canonical reads are delegated to the Project-owned state.
         """
         if not isinstance(
             query,
@@ -223,14 +281,14 @@ class AtlasApplication:
             )
 
         # --------------------------------------------------------------
-        # ENG-039 — Project Query
+        # ENG-039 — Project
         # --------------------------------------------------------------
 
         if query.name == "get_project":
             return self._project
 
         # --------------------------------------------------------------
-        # ENG-053 — Resource Position Query
+        # ENG-053 — Resource Position
         # --------------------------------------------------------------
 
         if query.name == "get_resource_position":
@@ -246,7 +304,6 @@ class AtlasApplication:
                     "resource_id must be an AtlasID"
                 )
 
-            # Canonical Resource must exist.
             self._project.require_resource(
                 resource_id
             )
@@ -259,12 +316,41 @@ class AtlasApplication:
 
             return position.as_mapping()
 
+        # --------------------------------------------------------------
+        # ENG-054 — Resource Rotation
+        # --------------------------------------------------------------
+
+        if query.name == "get_resource_rotation":
+            resource_id = query.parameters.get(
+                "resource_id"
+            )
+
+            if not isinstance(
+                resource_id,
+                AtlasID,
+            ):
+                raise TypeError(
+                    "resource_id must be an AtlasID"
+                )
+
+            self._project.require_resource(
+                resource_id
+            )
+
+            rotation = (
+                self._project.spatial_states.require_rotation(
+                    resource_id
+                )
+            )
+
+            return rotation.as_mapping()
+
         raise NotImplementedError(
             f"Query '{query.name}' is not implemented"
         )
 
     # ------------------------------------------------------------------
-    # Resource Presentation
+    # Presentation
     # ------------------------------------------------------------------
 
     def present_resource(
