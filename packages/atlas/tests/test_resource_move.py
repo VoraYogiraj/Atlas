@@ -3,42 +3,45 @@ ENG-053 — Atlas Resource Move
 
 RED-phase contract tests.
 
-These tests define the application-boundary and canonical-identity contract
-for Resource Move before the implementation exists.
+ENG-053 defines Resource Move as an absolute 3D position mutation.
 
-Important:
-    ENG-053 has not yet frozen the concrete representation of canonical
-    spatial state. Therefore these tests intentionally do not introduce
-    position/transform fields on AtlasResource.
+Canonical semantics:
+
+    AtlasID + absolute AtlasPosition
+        ->
+    canonical Resource-associated spatial state
+
+Important architectural boundaries:
+
+- AtlasResource does not own position/transform fields.
+- SceneNode is not the canonical engineering state.
+- Move enters Atlas through AtlasApplication.execute().
+- Canonical Resource identity remains AtlasID.
+- Spatial state is Resource-associated canonical state, separate from
+  AtlasResource itself.
+- Invalid requests must be atomic.
+- Move is absolute and therefore idempotent.
 """
 
 from __future__ import annotations
+
+import math
 
 import pytest
 
 from atlas.application.application import AtlasApplication
 from atlas.application.commands import AtlasCommand
+from atlas.application.queries import AtlasQuery
 from atlas.classification.classification import AtlasClassification
 from atlas.core.aid import AtlasID
 from atlas.core.resource import AtlasResource
+from atlas.core.spatial import AtlasPosition
 from atlas.project.project import AtlasProject
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def create_resource() -> AtlasResource:
-    classification = AtlasClassification(
-        id="wall",
-        name="Wall",
-    )
-
-    return AtlasResource(
-        classification=classification,
-        name="North Wall",
-    )
 
 
 def create_project_with_resource() -> tuple[
@@ -54,8 +57,6 @@ def create_project_with_resource() -> tuple[
         name="Wall",
     )
 
-    # AtlasProject requires the Resource's Classification
-    # to be registered before the Resource itself is added.
     project.add_classification(classification)
 
     resource = AtlasResource(
@@ -70,19 +71,57 @@ def create_project_with_resource() -> tuple[
 
 def create_move_command(
     resource_id: AtlasID,
+    *,
+    x: float,
+    y: float,
+    z: float,
 ) -> AtlasCommand:
     """
-    Build the ENG-053 command using only the semantics currently frozen.
+    Create the canonical ENG-053 Move command.
 
-    The concrete Move payload is intentionally not defined here because
-    ENG-053 has not yet frozen the representation of canonical spatial state.
+    Move uses an absolute target position.
     """
     return AtlasCommand(
         name="move_resource",
         payload={
             "resource_id": resource_id,
+            "position": {
+                "x": x,
+                "y": y,
+                "z": z,
+            },
         },
     )
+
+
+def create_position_query(
+    resource_id: AtlasID,
+) -> AtlasQuery:
+    """
+    Query the canonical spatial state associated with a Resource.
+    """
+    return AtlasQuery(
+        name="get_resource_position",
+        payload={
+            "resource_id": resource_id,
+        },
+    )
+
+
+def get_position(
+    application: AtlasApplication,
+    resource_id: AtlasID,
+) -> AtlasPosition:
+    """
+    Read canonical Resource spatial state through the application boundary.
+    """
+    result = application.query(
+        create_position_query(resource_id),
+    )
+
+    assert isinstance(result, AtlasPosition)
+
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -92,38 +131,59 @@ def create_move_command(
 
 class TestResourceMoveCommand:
     def test_move_command_can_be_constructed(self) -> None:
-        project, resource = create_project_with_resource()
+        _, resource = create_project_with_resource()
 
-        command = create_move_command(resource.aid)
+        command = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
 
         assert isinstance(command, AtlasCommand)
         assert command.name == "move_resource"
+
+    def test_move_command_targets_resource_by_atlas_id(self) -> None:
+        _, resource = create_project_with_resource()
+
+        command = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
+
         assert command.payload["resource_id"] == resource.aid
-
-    def test_move_command_requires_canonical_resource_identity(
-        self,
-    ) -> None:
-        project, resource = create_project_with_resource()
-
-        command = create_move_command(resource.aid)
-
         assert isinstance(command.payload["resource_id"], AtlasID)
 
-    def test_move_command_is_immutable(self) -> None:
-        project, resource = create_project_with_resource()
+    def test_move_command_contains_absolute_position(self) -> None:
+        _, resource = create_project_with_resource()
 
-        command = create_move_command(resource.aid)
+        command = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
+
+        assert command.payload["position"] == {
+            "x": 10.0,
+            "y": 20.0,
+            "z": 30.0,
+        }
+
+    def test_move_command_is_immutable(self) -> None:
+        _, resource = create_project_with_resource()
+
+        command = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
 
         with pytest.raises(Exception):
             command.name = "other"  # type: ignore[misc]
-
-    def test_move_command_does_not_own_domain_rules(self) -> None:
-        project, resource = create_project_with_resource()
-
-        command = create_move_command(resource.aid)
-
-        assert command.name == "move_resource"
-        assert isinstance(command.payload, dict)
 
 
 # ---------------------------------------------------------------------------
@@ -136,26 +196,41 @@ class TestResourceMoveApplicationBoundary:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        command = create_move_command(resource.aid)
+        command = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
 
-        # RED:
-        # AtlasApplication does not yet implement "move_resource".
         result = application.execute(command)
 
         assert result is not None
 
-    def test_unknown_resource_identity_is_rejected(self) -> None:
+    def test_position_is_observable_through_application_query(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        unknown_id = AtlasID.generate()
-        command = create_move_command(unknown_id)
+        command = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
 
-        with pytest.raises(Exception):
-            application.execute(command)
+        application.execute(command)
+
+        position = get_position(
+            application,
+            resource.aid,
+        )
+
+        assert position.x == 10.0
+        assert position.y == 20.0
+        assert position.z == 30.0
 
     def test_invalid_command_type_is_rejected(self) -> None:
-        project, resource = create_project_with_resource()
+        project, _ = create_project_with_resource()
         application = AtlasApplication(project)
 
         with pytest.raises(TypeError):
@@ -163,7 +238,7 @@ class TestResourceMoveApplicationBoundary:
 
 
 # ---------------------------------------------------------------------------
-# Canonical Resource Identity
+# Canonical Identity
 # ---------------------------------------------------------------------------
 
 
@@ -174,27 +249,353 @@ class TestResourceMoveIdentity:
 
         original_id = resource.aid
 
-        command = create_move_command(original_id)
+        command = create_move_command(
+            original_id,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
 
-        # RED:
         application.execute(command)
 
-        moved_resource = project.require_resource(original_id)
+        resolved = project.require_resource(original_id)
 
-        assert moved_resource.aid == original_id
+        assert resolved.aid == original_id
 
-    def test_move_targets_canonical_registry_resource(self) -> None:
+    def test_move_mutates_canonical_registry_resource(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        command = create_move_command(resource.aid)
+        command = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
 
-        # RED:
         application.execute(command)
 
         resolved = project.require_resource(resource.aid)
 
         assert resolved is resource
+
+
+# ---------------------------------------------------------------------------
+# Absolute Move Semantics
+# ---------------------------------------------------------------------------
+
+
+class TestResourceMoveSemantics:
+    def test_move_sets_absolute_position(self) -> None:
+        project, resource = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        first_move = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
+
+        second_move = create_move_command(
+            resource.aid,
+            x=100.0,
+            y=200.0,
+            z=300.0,
+        )
+
+        application.execute(first_move)
+        application.execute(second_move)
+
+        position = get_position(
+            application,
+            resource.aid,
+        )
+
+        assert position.x == 100.0
+        assert position.y == 200.0
+        assert position.z == 300.0
+
+    def test_move_is_not_a_delta_operation(self) -> None:
+        project, resource = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        first_move = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
+
+        second_move = create_move_command(
+            resource.aid,
+            x=5.0,
+            y=6.0,
+            z=7.0,
+        )
+
+        application.execute(first_move)
+        application.execute(second_move)
+
+        position = get_position(
+            application,
+            resource.aid,
+        )
+
+        assert position.x == 5.0
+        assert position.y == 6.0
+        assert position.z == 7.0
+
+    def test_identical_move_is_idempotent(self) -> None:
+        project, resource = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        command = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
+
+        application.execute(command)
+        first = get_position(
+            application,
+            resource.aid,
+        )
+
+        application.execute(command)
+        second = get_position(
+            application,
+            resource.aid,
+        )
+
+        assert second == first
+
+
+# ---------------------------------------------------------------------------
+# Position Validation
+# ---------------------------------------------------------------------------
+
+
+class TestResourceMoveValidation:
+    @pytest.mark.parametrize(
+        "position",
+        [
+            {},
+            {"x": 1.0},
+            {"y": 2.0},
+            {"z": 3.0},
+            {"x": 1.0, "y": 2.0},
+            {"x": 1.0, "z": 3.0},
+            {"y": 2.0, "z": 3.0},
+        ],
+    )
+    def test_missing_position_component_is_rejected(
+        self,
+        position: dict[str, object],
+    ) -> None:
+        project, resource = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        command = AtlasCommand(
+            name="move_resource",
+            payload={
+                "resource_id": resource.aid,
+                "position": position,
+            },
+        )
+
+        with pytest.raises((TypeError, ValueError)):
+            application.execute(command)
+
+    @pytest.mark.parametrize(
+        "axis",
+        ["x", "y", "z"],
+    )
+    def test_non_numeric_axis_is_rejected(
+        self,
+        axis: str,
+    ) -> None:
+        project, resource = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        position: dict[str, object] = {
+            "x": 1.0,
+            "y": 2.0,
+            "z": 3.0,
+        }
+
+        position[axis] = "invalid"
+
+        command = AtlasCommand(
+            name="move_resource",
+            payload={
+                "resource_id": resource.aid,
+                "position": position,
+            },
+        )
+
+        with pytest.raises((TypeError, ValueError)):
+            application.execute(command)
+
+    @pytest.mark.parametrize(
+        "value",
+        [
+            math.nan,
+            math.inf,
+            -math.inf,
+        ],
+    )
+    @pytest.mark.parametrize(
+        "axis",
+        ["x", "y", "z"],
+    )
+    def test_non_finite_axis_is_rejected(
+        self,
+        axis: str,
+        value: float,
+    ) -> None:
+        project, resource = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        position = {
+            "x": 1.0,
+            "y": 2.0,
+            "z": 3.0,
+        }
+
+        position[axis] = value
+
+        command = AtlasCommand(
+            name="move_resource",
+            payload={
+                "resource_id": resource.aid,
+                "position": position,
+            },
+        )
+
+        with pytest.raises((TypeError, ValueError)):
+            application.execute(command)
+
+    @pytest.mark.parametrize(
+        "position",
+        [
+            None,
+            (),
+            [],
+            "position",
+            123,
+        ],
+    )
+    def test_invalid_position_container_is_rejected(
+        self,
+        position: object,
+    ) -> None:
+        project, resource = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        command = AtlasCommand(
+            name="move_resource",
+            payload={
+                "resource_id": resource.aid,
+                "position": position,
+            },
+        )
+
+        with pytest.raises((TypeError, ValueError)):
+            application.execute(command)
+
+    def test_missing_resource_id_is_rejected(self) -> None:
+        project, _ = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        command = AtlasCommand(
+            name="move_resource",
+            payload={
+                "position": {
+                    "x": 1.0,
+                    "y": 2.0,
+                    "z": 3.0,
+                },
+            },
+        )
+
+        with pytest.raises((TypeError, ValueError, KeyError)):
+            application.execute(command)
+
+    @pytest.mark.parametrize(
+        "resource_id",
+        [
+            None,
+            "resource-id",
+            123,
+            object(),
+        ],
+    )
+    def test_invalid_resource_id_is_rejected(
+        self,
+        resource_id: object,
+    ) -> None:
+        project, _ = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        command = AtlasCommand(
+            name="move_resource",
+            payload={
+                "resource_id": resource_id,
+                "position": {
+                    "x": 1.0,
+                    "y": 2.0,
+                    "z": 3.0,
+                },
+            },
+        )
+
+        with pytest.raises((TypeError, ValueError)):
+            application.execute(command)
+
+
+# ---------------------------------------------------------------------------
+# Missing Resource
+# ---------------------------------------------------------------------------
+
+
+class TestResourceMoveMissingResource:
+    def test_unknown_resource_id_is_rejected(self) -> None:
+        project, _ = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        unknown_id = AtlasID.generate()
+
+        command = create_move_command(
+            unknown_id,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
+
+        with pytest.raises((KeyError, ValueError)):
+            application.execute(command)
+
+    def test_unknown_resource_does_not_create_resource(self) -> None:
+        project, _ = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        before_count = project.resources.count
+
+        unknown_id = AtlasID.generate()
+
+        command = create_move_command(
+            unknown_id,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
+
+        with pytest.raises((KeyError, ValueError)):
+            application.execute(command)
+
+        assert project.resources.count == before_count
 
 
 # ---------------------------------------------------------------------------
@@ -209,27 +610,33 @@ class TestResourceMoveIsolation:
 
         before_count = project.resources.count
 
-        command = create_move_command(resource.aid)
+        command = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
 
-        # RED:
         application.execute(command)
 
         assert project.resources.count == before_count
 
-    def test_move_does_not_replace_resource_identity(self) -> None:
+    def test_move_does_not_replace_resource_object(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        original_resource = resource
+        command = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
 
-        command = create_move_command(resource.aid)
-
-        # RED:
         application.execute(command)
 
         resolved = project.require_resource(resource.aid)
 
-        assert resolved is original_resource
+        assert resolved is resource
 
 
 # ---------------------------------------------------------------------------
@@ -242,174 +649,202 @@ class TestResourceMoveStatePreservation:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        original_classification = resource.classification
+        original = resource.classification
 
-        command = create_move_command(resource.aid)
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
 
-        # RED:
-        application.execute(command)
-
-        resolved = project.require_resource(resource.aid)
-
-        assert resolved.classification is original_classification
+        assert resource.classification is original
 
     def test_move_preserves_name(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        original_name = resource.name
+        original = resource.name
 
-        command = create_move_command(resource.aid)
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
 
-        # RED:
-        application.execute(command)
-
-        resolved = project.require_resource(resource.aid)
-
-        assert resolved.name == original_name
-
-    def test_move_preserves_lifecycle(self) -> None:
-        project, resource = create_project_with_resource()
-        application = AtlasApplication(project)
-
-        original_lifecycle = resource.lifecycle
-
-        command = create_move_command(resource.aid)
-
-        # RED:
-        application.execute(command)
-
-        resolved = project.require_resource(resource.aid)
-
-        assert resolved.lifecycle == original_lifecycle
+        assert resource.name == original
 
     def test_move_preserves_properties(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        original_properties = dict(resource.properties)
+        original = dict(resource.properties)
 
-        command = create_move_command(resource.aid)
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
 
-        # RED:
-        application.execute(command)
-
-        resolved = project.require_resource(resource.aid)
-
-        assert dict(resolved.properties) == original_properties
+        assert dict(resource.properties) == original
 
     def test_move_preserves_relationships(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        original_relationships = tuple(resource.relationships)
+        original = tuple(resource.relationships)
 
-        command = create_move_command(resource.aid)
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
 
-        # RED:
-        application.execute(command)
-
-        resolved = project.require_resource(resource.aid)
-
-        assert tuple(resolved.relationships) == original_relationships
+        assert tuple(resource.relationships) == original
 
     def test_move_preserves_metadata(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        original_metadata = dict(resource.metadata)
+        original = dict(resource.metadata)
 
-        command = create_move_command(resource.aid)
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
 
-        # RED:
-        application.execute(command)
-
-        resolved = project.require_resource(resource.aid)
-
-        assert dict(resolved.metadata) == original_metadata
+        assert dict(resource.metadata) == original
 
     def test_move_preserves_semantic_tags(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        original_tags = dict(resource.tags)
+        original = dict(resource.tags)
 
-        command = create_move_command(resource.aid)
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
 
-        # RED:
-        application.execute(command)
-
-        resolved = project.require_resource(resource.aid)
-
-        assert dict(resolved.tags) == original_tags
+        assert dict(resource.tags) == original
 
     def test_move_preserves_categories(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        original_categories = dict(resource.categories)
+        original = dict(resource.categories)
 
-        command = create_move_command(resource.aid)
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
 
-        # RED:
-        application.execute(command)
+        assert dict(resource.categories) == original
 
-        resolved = project.require_resource(resource.aid)
-
-        assert dict(resolved.categories) == original_categories
-
-
-# ---------------------------------------------------------------------------
-# Scene / Presentation Isolation
-# ---------------------------------------------------------------------------
-
-
-class TestResourceMoveSceneIsolation:
-    def test_move_does_not_require_scene(self) -> None:
+    def test_move_preserves_lifecycle(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        command = create_move_command(resource.aid)
+        original = resource.lifecycle
 
-        # RED:
-        # A canonical Resource Move must not require a Scene instance.
-        application.execute(command)
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
 
-    def test_move_does_not_mutate_scene_node_state(self) -> None:
+        assert resource.lifecycle == original
+
+
+# ---------------------------------------------------------------------------
+# Scene Independence
+# ---------------------------------------------------------------------------
+
+
+class TestResourceMoveSceneIndependence:
+    def test_move_requires_no_scene(self) -> None:
+        project, resource = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        result = application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
+
+        assert result is not None
+
+    def test_move_does_not_require_scene_node(self) -> None:
+        project, resource = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
+
+        position = get_position(
+            application,
+            resource.aid,
+        )
+
+        assert position == AtlasPosition(
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
+
+    def test_resource_does_not_receive_position_attribute(self) -> None:
         """
-        ENG-053 must not silently delegate Resource Move to ENG-051
-        SceneNode transformation.
+        ENG-053 must not put spatial state directly on AtlasResource.
         """
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        command = create_move_command(resource.aid)
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
 
-        # RED:
-        application.execute(command)
-
-
-# ---------------------------------------------------------------------------
-# Determinism
-# ---------------------------------------------------------------------------
-
-
-class TestResourceMoveDeterminism:
-    def test_identical_move_requests_are_deterministic(self) -> None:
-        project_a, resource_a = create_project_with_resource()
-        project_b, resource_b = create_project_with_resource()
-
-        application_a = AtlasApplication(project_a)
-        application_b = AtlasApplication(project_b)
-
-        command_a = create_move_command(resource_a.aid)
-        command_b = create_move_command(resource_b.aid)
-
-        # RED:
-        result_a = application_a.execute(command_a)
-        result_b = application_b.execute(command_b)
-
-        assert result_a == result_b
+        assert not hasattr(resource, "position")
+        assert not hasattr(resource, "transform")
 
 
 # ---------------------------------------------------------------------------
@@ -418,38 +853,141 @@ class TestResourceMoveDeterminism:
 
 
 class TestResourceMoveAtomicity:
-    def test_invalid_move_does_not_partially_mutate_resource(self) -> None:
+    def test_invalid_move_preserves_existing_position(self) -> None:
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
-        original = {
-            "aid": resource.aid,
-            "name": resource.name,
-            "classification": resource.classification,
-            "properties": dict(resource.properties),
-            "relationships": tuple(resource.relationships),
-            "metadata": dict(resource.metadata),
-            "tags": dict(resource.tags),
-            "categories": dict(resource.categories),
-            "lifecycle": resource.lifecycle,
-        }
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
+
+        before = get_position(
+            application,
+            resource.aid,
+        )
 
         invalid_command = AtlasCommand(
             name="move_resource",
             payload={
-                "resource_id": AtlasID.generate(),
+                "resource_id": resource.aid,
+                "position": {
+                    "x": math.nan,
+                    "y": 50.0,
+                    "z": 60.0,
+                },
             },
         )
 
-        with pytest.raises(Exception):
+        with pytest.raises((TypeError, ValueError)):
             application.execute(invalid_command)
 
-        assert resource.aid == original["aid"]
-        assert resource.name == original["name"]
-        assert resource.classification is original["classification"]
-        assert dict(resource.properties) == original["properties"]
-        assert tuple(resource.relationships) == original["relationships"]
-        assert dict(resource.metadata) == original["metadata"]
-        assert dict(resource.tags) == original["tags"]
-        assert dict(resource.categories) == original["categories"]
-        assert resource.lifecycle == original["lifecycle"]
+        after = get_position(
+            application,
+            resource.aid,
+        )
+
+        assert after == before
+
+    def test_unknown_resource_move_does_not_mutate_existing_state(
+        self,
+    ) -> None:
+        project, resource = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=10.0,
+                y=20.0,
+                z=30.0,
+            ),
+        )
+
+        before = get_position(
+            application,
+            resource.aid,
+        )
+
+        unknown_id = AtlasID.generate()
+
+        with pytest.raises((KeyError, ValueError)):
+            application.execute(
+                create_move_command(
+                    unknown_id,
+                    x=100.0,
+                    y=200.0,
+                    z=300.0,
+                ),
+            )
+
+        after = get_position(
+            application,
+            resource.aid,
+        )
+
+        assert after == before
+
+
+# ---------------------------------------------------------------------------
+# Determinism
+# ---------------------------------------------------------------------------
+
+
+class TestResourceMoveDeterminism:
+    def test_identical_requests_produce_identical_position(
+        self,
+    ) -> None:
+        project, resource = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        command = create_move_command(
+            resource.aid,
+            x=10.0,
+            y=20.0,
+            z=30.0,
+        )
+
+        application.execute(command)
+
+        first = get_position(
+            application,
+            resource.aid,
+        )
+
+        application.execute(command)
+
+        second = get_position(
+            application,
+            resource.aid,
+        )
+
+        assert second == first
+
+    def test_move_result_does_not_depend_on_scene_state(self) -> None:
+        project, resource = create_project_with_resource()
+        application = AtlasApplication(project)
+
+        application.execute(
+            create_move_command(
+                resource.aid,
+                x=11.0,
+                y=22.0,
+                z=33.0,
+            ),
+        )
+
+        position = get_position(
+            application,
+            resource.aid,
+        )
+
+        assert position == AtlasPosition(
+            x=11.0,
+            y=22.0,
+            z=33.0,
+        )
