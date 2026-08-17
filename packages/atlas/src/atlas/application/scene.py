@@ -21,12 +21,23 @@ def _text(value: object, name: str) -> str:
 def _vector(value: object, name: str) -> Vector3:
     if isinstance(value, str) or not isinstance(value, Iterable):
         raise TypeError(f"{name} must be a three-component vector")
+
     parts = tuple(value)
+
     if len(parts) != 3:
         raise ValueError(f"{name} must contain exactly three components")
-    if any(not isinstance(item, (int, float)) or isinstance(item, bool) for item in parts):
+
+    if any(
+        not isinstance(item, (int, float)) or isinstance(item, bool)
+        for item in parts
+    ):
         raise TypeError(f"{name} components must be numeric")
-    return (float(parts[0]), float(parts[1]), float(parts[2]))
+
+    return (
+        float(parts[0]),
+        float(parts[1]),
+        float(parts[2]),
+    )
 
 
 class AtlasSceneNode:
@@ -47,20 +58,41 @@ class AtlasSceneNode:
     ) -> None:
         self._node_id = _text(node_id, "node_id")
         self._name = _text(name, "name")
+
         if resource_id is not None and not isinstance(resource_id, AtlasID):
             raise TypeError("resource_id must be an AtlasID or None")
+
         if parent_node_id is not None:
-            self._parent_node_id = _text(parent_node_id, "parent_node_id")
+            self._parent_node_id = _text(
+                parent_node_id,
+                "parent_node_id",
+            )
         else:
             self._parent_node_id = None
+
         if not isinstance(visible, bool):
             raise TypeError("visible must be a bool")
+
         if not isinstance(order, int) or isinstance(order, bool):
             raise TypeError("order must be an int")
+
         self._resource_id = resource_id
-        self._position = _vector(position, "position")
-        self._rotation = _vector(rotation, "rotation")
-        self._scale = _vector(scale, "scale")
+
+        self._position = _vector(
+            position,
+            "position",
+        )
+
+        self._rotation = _vector(
+            rotation,
+            "rotation",
+        )
+
+        self._scale = _vector(
+            scale,
+            "scale",
+        )
+
         self._visible = visible
         self._order = order
 
@@ -103,23 +135,50 @@ class AtlasSceneNode:
     def set_visible(self, visible: bool) -> None:
         if not isinstance(visible, bool):
             raise TypeError("visible must be a bool")
+
         self._visible = visible
 
     def set_order(self, order: int) -> None:
         if not isinstance(order, int) or isinstance(order, bool):
             raise TypeError("order must be an int")
+
         self._order = order
 
     def _set_parent(self, parent_node_id: str | None) -> None:
         self._parent_node_id = parent_node_id
 
+    def _set_position(self, position: Vector3) -> None:
+        """Internal transformation mutation used by ENG-051 Basic Editing."""
+        self._position = _vector(position, "position")
+
+    def _set_rotation(self, rotation: Vector3) -> None:
+        """Internal transformation mutation used by ENG-051 Basic Editing."""
+        self._rotation = _vector(rotation, "rotation")
+
+    def _set_scale(self, scale: Vector3) -> None:
+        """Internal transformation mutation used by ENG-051 Basic Editing."""
+        self._scale = _vector(scale, "scale")
+
 
 class AtlasScene:
     """Framework-independent 3D Workspace presentation state."""
 
-    def __init__(self, *, scene_id: str, name: str) -> None:
-        self._scene_id = _text(scene_id, "scene_id")
-        self._name = _text(name, "name")
+    def __init__(
+        self,
+        *,
+        scene_id: str,
+        name: str,
+    ) -> None:
+        self._scene_id = _text(
+            scene_id,
+            "scene_id",
+        )
+
+        self._name = _text(
+            name,
+            "name",
+        )
+
         self._nodes: dict[str, AtlasSceneNode] = {}
         self._selected_node_id: str | None = None
         self._is_loading = False
@@ -152,88 +211,184 @@ class AtlasScene:
 
     @property
     def nodes(self) -> tuple[AtlasSceneNode, ...]:
-        return tuple(sorted(self._nodes.values(), key=lambda node: (node.order, node.node_id)))
+        return tuple(
+            sorted(
+                self._nodes.values(),
+                key=lambda node: (
+                    node.order,
+                    node.node_id,
+                ),
+            )
+        )
 
     @property
     def root_nodes(self) -> tuple[AtlasSceneNode, ...]:
-        return tuple(node for node in self.nodes if node.parent_node_id is None)
+        return tuple(
+            node
+            for node in self.nodes
+            if node.parent_node_id is None
+        )
 
     def add_node(self, node: AtlasSceneNode) -> None:
         if not isinstance(node, AtlasSceneNode):
             raise TypeError("node must be an AtlasSceneNode")
+
         if node.node_id in self._nodes:
-            raise ValueError(f"Scene node already exists: {node.node_id}")
-        if node.parent_node_id is not None and node.parent_node_id not in self._nodes:
-            raise ValueError("A node parent must already exist in the Scene")
+            raise ValueError(
+                f"Scene node already exists: {node.node_id}"
+            )
+
+        if (
+            node.parent_node_id is not None
+            and node.parent_node_id not in self._nodes
+        ):
+            raise ValueError(
+                "A node parent must already exist in the Scene"
+            )
+
         self._nodes[node.node_id] = node
 
     def get_node(self, node_id: str) -> AtlasSceneNode:
-        _text(node_id, "node_id")
+        _text(
+            node_id,
+            "node_id",
+        )
+
         return self._nodes[node_id]
 
     def remove_node(self, node_id: str) -> AtlasSceneNode:
         node = self.get_node(node_id)
-        if any(child.parent_node_id == node_id for child in self._nodes.values()):
-            raise ValueError("Cannot remove a Scene node with children")
+
+        if any(
+            child.parent_node_id == node_id
+            for child in self._nodes.values()
+        ):
+            raise ValueError(
+                "Cannot remove a Scene node with children"
+            )
+
         del self._nodes[node_id]
+
         if self._selected_node_id == node_id:
             self._selected_node_id = None
+
         return node
 
-    def set_parent(self, node_id: str, parent_node_id: str | None) -> None:
+    def set_parent(
+        self,
+        node_id: str,
+        parent_node_id: str | None,
+    ) -> None:
         node = self.get_node(node_id)
+
         if parent_node_id is None:
             node._set_parent(None)
             return
-        _text(parent_node_id, "parent_node_id")
+
+        _text(
+            parent_node_id,
+            "parent_node_id",
+        )
+
         self.get_node(parent_node_id)
+
         if node_id == parent_node_id:
-            raise ValueError("A Scene node cannot be its own parent")
+            raise ValueError(
+                "A Scene node cannot be its own parent"
+            )
+
         ancestor_id: str | None = parent_node_id
+
         while ancestor_id is not None:
             if ancestor_id == node_id:
-                raise ValueError("Scene node hierarchy cannot contain cycles")
-            ancestor_id = self._nodes[ancestor_id].parent_node_id
+                raise ValueError(
+                    "Scene node hierarchy cannot contain cycles"
+                )
+
+            ancestor_id = self._nodes[
+                ancestor_id
+            ].parent_node_id
+
         node._set_parent(parent_node_id)
 
-    def set_selected_node(self, node_id: str | None) -> None:
+    def set_selected_node(
+        self,
+        node_id: str | None,
+    ) -> None:
         if node_id is None:
             self._selected_node_id = None
             return
+
         self.get_node(node_id)
+
         self._selected_node_id = node_id
 
-    def set_loading(self, is_loading: bool) -> None:
+    def set_loading(
+        self,
+        is_loading: bool,
+    ) -> None:
         if not isinstance(is_loading, bool):
             raise TypeError("is_loading must be a bool")
+
         self._is_loading = is_loading
 
-    def set_error(self, error: str | None) -> None:
+    def set_error(
+        self,
+        error: str | None,
+    ) -> None:
         if error is not None:
-            self._error = _text(error, "error")
+            self._error = _text(
+                error,
+                "error",
+            )
             return
+
         self._error = None
 
     def initialize(self) -> None:
         if self._lifecycle != "created":
-            raise RuntimeError(f"Cannot initialize Scene from state '{self._lifecycle}'")
+            raise RuntimeError(
+                f"Cannot initialize Scene from state "
+                f"'{self._lifecycle}'"
+            )
+
         self._lifecycle = "initialized"
 
     def activate(self) -> None:
-        if self._lifecycle not in {"initialized", "inactive"}:
-            raise RuntimeError("Scene must be initialized or inactive before activation")
+        if self._lifecycle not in {
+            "initialized",
+            "inactive",
+        }:
+            raise RuntimeError(
+                "Scene must be initialized or inactive "
+                "before activation"
+            )
+
         self._lifecycle = "active"
 
     def deactivate(self) -> None:
         if self._lifecycle != "active":
-            raise RuntimeError(f"Cannot deactivate Scene from state '{self._lifecycle}'")
+            raise RuntimeError(
+                f"Cannot deactivate Scene from state "
+                f"'{self._lifecycle}'"
+            )
+
         self._lifecycle = "inactive"
 
     def dispose(self) -> None:
         if self._lifecycle == "disposed":
             return
-        if self._lifecycle not in {"created", "initialized", "inactive"}:
-            raise RuntimeError(f"Cannot dispose Scene from state '{self._lifecycle}'")
+
+        if self._lifecycle not in {
+            "created",
+            "initialized",
+            "inactive",
+        }:
+            raise RuntimeError(
+                f"Cannot dispose Scene from state "
+                f"'{self._lifecycle}'"
+            )
+
         self._selected_node_id = None
         self._is_loading = False
         self._lifecycle = "disposed"

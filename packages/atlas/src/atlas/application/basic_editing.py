@@ -1,59 +1,53 @@
-"""
-ENG-051 — Atlas Basic Editing.
-
-Provides deterministic, renderer-independent transformation editing
-for Atlas scene nodes.
-
-Basic Editing owns transformation mutation of Scene presentation state.
-It does not own selection, gizmos, rendering, engineering resources,
-relationships, persistence, history, or undo/redo.
-"""
+"""ENG-051 — Atlas Basic Editing."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from atlas.application.scene import AtlasScene
+from .scene import AtlasScene
 
 
 class AtlasBasicEditing:
-    """Deterministic transformation editing for Atlas scene nodes."""
+    """Deterministic presentation-state transformation editing.
+
+    ENG-051 owns basic SceneNode transformation editing.
+
+    This layer:
+    - operates only on AtlasScene presentation state,
+    - does not mutate AtlasResource or AtlasProject state,
+    - does not own selection,
+    - does not own gizmos,
+    - does not perform rendering or input handling,
+    - performs single-axis translation, rotation, and scale edits.
+
+    The supplied value is the resulting value of the selected axis.
+    """
 
     _VALID_AXES = frozenset({"x", "y", "z"})
 
     def __eq__(self, other: object) -> bool:
-        """Basic editing has no mutable instance state."""
+        """Basic editing has no instance-specific state."""
         return isinstance(other, AtlasBasicEditing)
 
-    def __hash__(self) -> int:
-        """Keep equality/hash behavior consistent."""
-        return hash(type(self))
-
-    @classmethod
-    def _validate_axis(cls, axis: Any) -> str:
-        """Validate and return a canonical axis."""
+    def _validate_axis(self, axis: Any) -> str:
         if not isinstance(axis, str):
-            raise TypeError("axis must be one of: 'x', 'y', 'z'")
+            raise TypeError("axis must be a string")
 
-        if axis not in cls._VALID_AXES:
-            raise ValueError("axis must be one of: 'x', 'y', 'z'")
+        if axis not in self._VALID_AXES:
+            raise ValueError("axis must be one of: x, y, z")
 
         return axis
 
-    @staticmethod
-    def _validate_value(value: Any) -> float:
-        """Validate a transform value without coercing invalid input."""
-        if isinstance(value, bool):
-            raise TypeError("transform value must be numeric")
-
-        if not isinstance(value, (int, float)):
-            raise TypeError("transform value must be numeric")
+    def _validate_value(self, value: Any) -> float:
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise TypeError("value must be numeric")
 
         return float(value)
 
-    @staticmethod
-    def _get_node(scene: AtlasScene, node_id: str) -> Any:
-        """Return the target node or raise KeyError."""
+    def _get_node(self, scene: AtlasScene, node_id: str):
+        if not isinstance(scene, AtlasScene):
+            raise TypeError("scene must be an AtlasScene")
+
         return scene.get_node(node_id)
 
     @staticmethod
@@ -62,11 +56,10 @@ class AtlasBasicEditing:
         axis: str,
         value: float,
     ) -> tuple[float, float, float]:
-        """Return a new vector with exactly one axis replaced."""
-        index = {"x": 0, "y": 1, "z": 2}[axis]
         values = list(vector)
+        index = {"x": 0, "y": 1, "z": 2}[axis]
         values[index] = value
-        return tuple(values)
+        return (values[0], values[1], values[2])
 
     def translate(
         self,
@@ -75,7 +68,7 @@ class AtlasBasicEditing:
         axis: str,
         value: Any,
     ) -> None:
-        """Set one translation axis on a scene node."""
+        """Set one translation axis on a SceneNode."""
         axis = self._validate_axis(axis)
         value = self._validate_value(value)
         node = self._get_node(scene, node_id)
@@ -95,7 +88,7 @@ class AtlasBasicEditing:
         axis: str,
         value: Any,
     ) -> None:
-        """Set one rotation axis on a scene node."""
+        """Set one rotation axis on a SceneNode."""
         axis = self._validate_axis(axis)
         value = self._validate_value(value)
         node = self._get_node(scene, node_id)
@@ -115,7 +108,7 @@ class AtlasBasicEditing:
         axis: str,
         value: Any,
     ) -> None:
-        """Set one scale axis on a scene node."""
+        """Set one scale axis on a SceneNode."""
         axis = self._validate_axis(axis)
         value = self._validate_value(value)
         node = self._get_node(scene, node_id)
@@ -127,3 +120,6 @@ class AtlasBasicEditing:
         )
 
         node._set_scale(new_scale)
+
+
+__all__ = ["AtlasBasicEditing"]
