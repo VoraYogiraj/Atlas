@@ -16,6 +16,7 @@ ENG-051 — Atlas Basic Editing
 """
 
 from atlas.application.application import AtlasApplication
+from atlas.application.basic_editing import AtlasBasicEditing
 from atlas.application.camera import AtlasCamera
 from atlas.application.commands import AtlasCommand
 from atlas.application.dashboard import (
@@ -34,7 +35,6 @@ from atlas.application.explorer import (
     AtlasExplorerPresentation,
 )
 from atlas.application.gizmo import AtlasGizmo
-from atlas.application.basic_editing import AtlasBasicEditing
 from atlas.application.inspector import (
     AtlasInspector,
     AtlasInspectorClassification,
