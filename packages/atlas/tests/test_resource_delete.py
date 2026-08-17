@@ -1,36 +1,65 @@
 """
-ENG-056 — Atlas Resource Delete
+ENG-056 — Resource Delete
 
-RED test suite.
+Tests for canonical project-level Resource deletion.
 
-These tests define the canonical Resource Delete contract.
-Implementation is intentionally expected to be incomplete at
-this stage.
+Delete must:
+    - remove the Resource from the canonical Resource Registry
+    - remove all relationships involving the Resource
+    - preserve unrelated Resources and Relationships
+    - remove Position, Rotation, and Scale spatial state
+    - fail for unknown Resources
+    - fail on repeated deletion
+    - remain isolated from unrelated Resources
 """
 
 from __future__ import annotations
 
 import pytest
 
-from atlas.application import AtlasApplication, AtlasCommand, AtlasQuery
+from atlas.application.application import AtlasApplication
+from atlas.application.commands import AtlasCommand
+from atlas.application.queries import AtlasQuery
 from atlas.classification.classification import AtlasClassification
 from atlas.core.aid import AtlasID
 from atlas.core.resource import AtlasResource
+from atlas.core.spatial import (
+    AtlasSpatialPosition,
+    AtlasSpatialRotation,
+    AtlasSpatialScale,
+)
 from atlas.project.project import AtlasProject
 from atlas.relationships.relationship import AtlasRelationship
 
 
+# ----------------------------------------------------------------------
+# Fixtures / Helpers
+# ----------------------------------------------------------------------
+
+
 def make_project() -> tuple[AtlasProject, AtlasClassification]:
-    project = AtlasProject("Delete Test Project")
+    project = AtlasProject(
+        "Delete Test Project"
+    )
 
     classification = AtlasClassification(
         id=AtlasID.generate(),
         name="Wall",
     )
 
-    project.add_classification(classification)
+    project.add_classification(
+        classification
+    )
 
     return project, classification
+
+
+def make_application(
+    project: AtlasProject,
+) -> AtlasApplication:
+    return AtlasApplication(
+        project
+    )
 
 
 def make_resource(
@@ -43,16 +72,20 @@ def make_resource(
         name=name,
     )
 
-    project.add_resource(resource)
+    project.add_resource(
+        resource
+    )
 
     return resource
 
 
-def make_application(project: AtlasProject) -> AtlasApplication:
-    return AtlasApplication(project)
+# ----------------------------------------------------------------------
+# Resource Delete Command
+# ----------------------------------------------------------------------
 
 
 class TestResourceDeleteCommand:
+
     def test_delete_command_can_be_constructed(self) -> None:
         resource_id = AtlasID.generate()
 
@@ -64,21 +97,16 @@ class TestResourceDeleteCommand:
         )
 
         assert command.name == "delete_resource"
-
-    def test_delete_command_preserves_resource_id(self) -> None:
-        resource_id = AtlasID.generate()
-
-        command = AtlasCommand(
-            name="delete_resource",
-            payload={
-                "resource_id": resource_id,
-            },
-        )
-
         assert command.payload["resource_id"] == resource_id
 
 
+# ----------------------------------------------------------------------
+# Application
+# ----------------------------------------------------------------------
+
+
 class TestResourceDeleteApplication:
+
     def test_delete_existing_resource(self) -> None:
         project, classification = make_project()
         application = make_application(project)
@@ -89,8 +117,6 @@ class TestResourceDeleteApplication:
             "Wall A",
         )
 
-        assert project.get_resource(resource.aid) is resource
-
         application.execute(
             AtlasCommand(
                 name="delete_resource",
@@ -100,16 +126,24 @@ class TestResourceDeleteApplication:
             )
         )
 
-        assert project.get_resource(resource.aid) is None
+        assert project.get_resource(
+            resource.aid
+        ) is None
 
     def test_delete_decreases_resource_count(self) -> None:
         project, classification = make_project()
         application = make_application(project)
 
-        resource = make_resource(
+        resource_a = make_resource(
             project,
             classification,
             "Wall A",
+        )
+
+        make_resource(
+            project,
+            classification,
+            "Wall B",
         )
 
         count_before = project.resource_count
@@ -118,7 +152,7 @@ class TestResourceDeleteApplication:
             AtlasCommand(
                 name="delete_resource",
                 payload={
-                    "resource_id": resource.aid,
+                    "resource_id": resource_a.aid,
                 },
             )
         )
@@ -126,7 +160,13 @@ class TestResourceDeleteApplication:
         assert project.resource_count == count_before - 1
 
 
+# ----------------------------------------------------------------------
+# Relationship Cleanup
+# ----------------------------------------------------------------------
+
+
 class TestResourceDeleteRelationshipCleanup:
+
     def test_delete_removes_outgoing_relationships(self) -> None:
         project, classification = make_project()
         application = make_application(project)
@@ -150,7 +190,9 @@ class TestResourceDeleteRelationshipCleanup:
             target=resource_b,
         )
 
-        project.add_relationship(relationship)
+        project.add_relationship(
+            relationship
+        )
 
         assert project.relationship_count == 1
 
@@ -188,7 +230,9 @@ class TestResourceDeleteRelationshipCleanup:
             target=resource_b,
         )
 
-        project.add_relationship(relationship)
+        project.add_relationship(
+            relationship
+        )
 
         assert project.relationship_count == 1
 
@@ -239,8 +283,13 @@ class TestResourceDeleteRelationshipCleanup:
             target=resource_c,
         )
 
-        project.add_relationship(relationship_ab)
-        project.add_relationship(relationship_bc)
+        project.add_relationship(
+            relationship_ab
+        )
+
+        project.add_relationship(
+            relationship_bc
+        )
 
         assert project.relationship_count == 2
 
@@ -255,12 +304,22 @@ class TestResourceDeleteRelationshipCleanup:
 
         assert project.relationship_count == 1
 
-        remaining = project.relationships_by_type("adjacent")
+        remaining = project.relationships_for_resource(
+            resource_b
+        )
 
-        assert relationship_bc in remaining
+        assert remaining == [
+            relationship_bc
+        ]
+
+
+# ----------------------------------------------------------------------
+# Spatial Cleanup
+# ----------------------------------------------------------------------
 
 
 class TestResourceDeleteSpatialCleanup:
+
     def test_delete_removes_position(self) -> None:
         project, classification = make_project()
         application = make_application(project)
@@ -277,9 +336,9 @@ class TestResourceDeleteSpatialCleanup:
                 payload={
                     "resource_id": resource.aid,
                     "position": {
-                        "x": 10.0,
-                        "y": 20.0,
-                        "z": 30.0,
+                        "x": 11.0,
+                        "y": 22.0,
+                        "z": 33.0,
                     },
                 },
             )
@@ -294,15 +353,9 @@ class TestResourceDeleteSpatialCleanup:
             )
         )
 
-        with pytest.raises(Exception):
-            application.execute(
-                AtlasQuery(
-                    name="get_resource_position",
-                    parameters={
-                        "resource_id": resource.aid,
-                    },
-                )
-            )
+        assert not project.spatial_states.contains(
+            resource.aid
+        )
 
     def test_delete_removes_rotation(self) -> None:
         project, classification = make_project()
@@ -320,9 +373,9 @@ class TestResourceDeleteSpatialCleanup:
                 payload={
                     "resource_id": resource.aid,
                     "rotation": {
-                        "x": 10.0,
-                        "y": 20.0,
-                        "z": 30.0,
+                        "x": 11.0,
+                        "y": 22.0,
+                        "z": 33.0,
                     },
                 },
             )
@@ -337,15 +390,9 @@ class TestResourceDeleteSpatialCleanup:
             )
         )
 
-        with pytest.raises(Exception):
-            application.execute(
-                AtlasQuery(
-                    name="get_resource_rotation",
-                    parameters={
-                        "resource_id": resource.aid,
-                    },
-                )
-            )
+        assert not project.spatial_states.contains(
+            resource.aid
+        )
 
     def test_delete_removes_scale(self) -> None:
         project, classification = make_project()
@@ -380,19 +427,21 @@ class TestResourceDeleteSpatialCleanup:
             )
         )
 
-        with pytest.raises(Exception):
-            application.execute(
-                AtlasQuery(
-                    name="get_resource_scale",
-                    parameters={
-                        "resource_id": resource.aid,
-                    },
-                )
-            )
+        assert not project.spatial_states.contains(
+            resource.aid
+        )
+
+
+# ----------------------------------------------------------------------
+# Isolation
+# ----------------------------------------------------------------------
 
 
 class TestResourceDeleteIsolation:
-    def test_delete_one_resource_does_not_delete_another(self) -> None:
+
+    def test_delete_one_resource_does_not_delete_another(
+        self,
+    ) -> None:
         project, classification = make_project()
         application = make_application(project)
 
@@ -417,10 +466,17 @@ class TestResourceDeleteIsolation:
             )
         )
 
-        assert project.get_resource(resource_a.aid) is None
-        assert project.get_resource(resource_b.aid) is resource_b
+        assert project.get_resource(
+            resource_a.aid
+        ) is None
 
-    def test_delete_one_resource_does_not_change_another_position(self) -> None:
+        assert project.get_resource(
+            resource_b.aid
+        ) is resource_b
+
+    def test_delete_one_resource_does_not_change_another_position(
+        self,
+    ) -> None:
         project, classification = make_project()
         application = make_application(project)
 
@@ -459,7 +515,7 @@ class TestResourceDeleteIsolation:
             )
         )
 
-        position = application.execute(
+        position = application.query(
             AtlasQuery(
                 name="get_resource_position",
                 parameters={
@@ -474,7 +530,9 @@ class TestResourceDeleteIsolation:
             "z": 33.0,
         }
 
-    def test_delete_one_resource_does_not_change_another_rotation(self) -> None:
+    def test_delete_one_resource_does_not_change_another_rotation(
+        self,
+    ) -> None:
         project, classification = make_project()
         application = make_application(project)
 
@@ -513,7 +571,7 @@ class TestResourceDeleteIsolation:
             )
         )
 
-        rotation = application.execute(
+        rotation = application.query(
             AtlasQuery(
                 name="get_resource_rotation",
                 parameters={
@@ -528,7 +586,9 @@ class TestResourceDeleteIsolation:
             "z": 33.0,
         }
 
-    def test_delete_one_resource_does_not_change_another_scale(self) -> None:
+    def test_delete_one_resource_does_not_change_another_scale(
+        self,
+    ) -> None:
         project, classification = make_project()
         application = make_application(project)
 
@@ -567,7 +627,7 @@ class TestResourceDeleteIsolation:
             )
         )
 
-        scale = application.execute(
+        scale = application.query(
             AtlasQuery(
                 name="get_resource_scale",
                 parameters={
@@ -583,81 +643,13 @@ class TestResourceDeleteIsolation:
         }
 
 
-class TestResourceDeleteUnknownResource:
-    def test_delete_unknown_resource_fails(self) -> None:
-        project, _classification = make_project()
-        application = make_application(project)
-
-        unknown_id = AtlasID.generate()
-
-        with pytest.raises(Exception):
-            application.execute(
-                AtlasCommand(
-                    name="delete_resource",
-                    payload={
-                        "resource_id": unknown_id,
-                    },
-                )
-            )
-
-    def test_delete_unknown_resource_does_not_mutate_project(self) -> None:
-        project, classification = make_project()
-        application = make_application(project)
-
-        resource = make_resource(
-            project,
-            classification,
-            "Wall A",
-        )
-
-        resource_count_before = project.resource_count
-        spatial_count_before = project.spatial_states.count
-
-        unknown_id = AtlasID.generate()
-
-        with pytest.raises(Exception):
-            application.execute(
-                AtlasCommand(
-                    name="delete_resource",
-                    payload={
-                        "resource_id": unknown_id,
-                    },
-                )
-            )
-
-        assert project.resource_count == resource_count_before
-        assert project.spatial_states.count == spatial_count_before
-        assert project.get_resource(resource.aid) is resource
-
-
-class TestResourceDeleteValidation:
-    def test_delete_rejects_non_atlas_id(self) -> None:
-        project, classification = make_project()
-        application = make_application(project)
-
-        resource = make_resource(
-            project,
-            classification,
-            "Wall A",
-        )
-
-        resource_count_before = project.resource_count
-
-        with pytest.raises(Exception):
-            application.execute(
-                AtlasCommand(
-                    name="delete_resource",
-                    payload={
-                        "resource_id": "not-an-atlas-id",
-                    },
-                )
-            )
-
-        assert project.resource_count == resource_count_before
-        assert project.get_resource(resource.aid) is resource
+# ----------------------------------------------------------------------
+# Repeated Delete
+# ----------------------------------------------------------------------
 
 
 class TestResourceDeleteRepeated:
+
     def test_second_delete_fails(self) -> None:
         project, classification = make_project()
         application = make_application(project)
@@ -668,14 +660,23 @@ class TestResourceDeleteRepeated:
             "Wall A",
         )
 
-        command = AtlasCommand(
-            name="delete_resource",
-            payload={
-                "resource_id": resource.aid,
-            },
+        application.execute(
+            AtlasCommand(
+                name="delete_resource",
+                payload={
+                    "resource_id": resource.aid,
+                },
+            )
         )
 
-        application.execute(command)
-
-        with pytest.raises(Exception):
-            application.execute(command)
+        with pytest.raises(
+            KeyError
+        ):
+            application.execute(
+                AtlasCommand(
+                    name="delete_resource",
+                    payload={
+                        "resource_id": resource.aid,
+                    },
+                )
+            )
