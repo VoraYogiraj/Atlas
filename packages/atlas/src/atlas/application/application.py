@@ -6,6 +6,7 @@ ENG-052 — Atlas Resource Create
 ENG-053 — Atlas Resource Move
 ENG-054 — Atlas Resource Rotate
 ENG-055 — Atlas Resource Scale
+ENG-056 — Atlas Resource Delete
 
 Thin application boundary between UI interactions and the canonical
 Atlas domain model.
@@ -324,6 +325,38 @@ class AtlasApplication:
             )
 
             return spatial_scale.as_mapping()
+
+        # --------------------------------------------------------------
+        # ENG-056 — Resource Delete
+        # --------------------------------------------------------------
+
+        if command.name == "delete_resource":
+            resource_id = command.payload.get(
+                "resource_id"
+            )
+
+            if not isinstance(
+                resource_id,
+                AtlasID,
+            ):
+                raise TypeError(
+                    "resource_id must be an AtlasID"
+                )
+
+            resource = self._project.require_resource(
+                resource_id
+            )
+
+            removed = self._project.remove_resource(
+                resource
+            )
+
+            if removed is None:
+                raise KeyError(
+                    f"Resource not found: {resource_id}"
+                )
+
+            return removed
 
         raise NotImplementedError(
             f"Command '{command.name}' is not implemented"
