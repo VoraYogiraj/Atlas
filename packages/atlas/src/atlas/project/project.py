@@ -19,6 +19,7 @@ Specifications:
     ENG-022 — Project Relationship Queries
     ENG-053 — Atlas Resource Move
     ENG-054 — Atlas Resource Rotate
+    ENG-055 — Atlas Resource Scale
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ from atlas.core.resource import AtlasResource
 from atlas.core.spatial import (
     AtlasSpatialPosition,
     AtlasSpatialRotation,
+    AtlasSpatialScale,
     AtlasSpatialStateRegistry,
 )
 from atlas.graph.graph import AtlasResourceGraph
@@ -342,7 +344,9 @@ class AtlasProject:
         """
         Initialize the complete canonical spatial state for a Resource.
 
-        Both ENG-053 position and ENG-054 rotation start at origin/zero.
+        ENG-053 position starts at origin.
+        ENG-054 rotation starts at zero.
+        ENG-055 scale starts at neutral uniform scale.
         """
         self._spatial_states.set_position(
             resource.aid,
@@ -359,6 +363,15 @@ class AtlasProject:
                 x=0.0,
                 y=0.0,
                 z=0.0,
+            ),
+        )
+
+        self._spatial_states.set_scale(
+            resource.aid,
+            AtlasSpatialScale(
+                x=1.0,
+                y=1.0,
+                z=1.0,
             ),
         )
 
