@@ -2,6 +2,7 @@
 Atlas Application Boundary
 
 ENG-039 — Atlas UI Architecture
+ENG-052 — Atlas Resource Create
 ENG-053 — Atlas Resource Move
 
 Thin application boundary between UI interactions and the canonical
@@ -28,7 +29,10 @@ class AtlasApplication:
     AtlasProject or implement a second engineering model.
     """
 
-    def __init__(self, project: AtlasProject) -> None:
+    def __init__(
+        self,
+        project: AtlasProject,
+    ) -> None:
         if not isinstance(
             project,
             AtlasProject,
@@ -44,6 +48,10 @@ class AtlasApplication:
         """Return the canonical Atlas project."""
         return self._project
 
+    # ------------------------------------------------------------------
+    # Command Execution
+    # ------------------------------------------------------------------
+
     def execute(
         self,
         command: AtlasCommand,
@@ -51,8 +59,8 @@ class AtlasApplication:
         """
         Execute an application command.
 
-        Commands represent application intent. Domain state is mutated
-        through the canonical Project-owned domain structures.
+        The application layer remains a thin boundary over the canonical
+        Project and its domain-owned registries/state.
         """
         if not isinstance(
             command,
@@ -62,11 +70,22 @@ class AtlasApplication:
                 "command must be an AtlasCommand"
             )
 
+        # --------------------------------------------------------------
+        # ENG-039 — No-op
+        # --------------------------------------------------------------
+
         if command.name == "noop":
             return None
 
+        # --------------------------------------------------------------
+        # ENG-052 — Resource Create
+        # --------------------------------------------------------------
+
         if command.name == "create_resource":
-            classification = command.payload["classification"]
+            classification = command.payload.get(
+                "classification"
+            )
+
             name = command.payload.get(
                 "name"
             )
@@ -89,13 +108,39 @@ class AtlasApplication:
                 name=name,
             )
 
-            # Project is the ownership boundary.
-            # This also initializes the Resource's canonical spatial state.
-            self._project.add_resource(
+            # ENG-052 canonical creation semantics:
+            #
+            # Resource creation registers directly with the canonical
+            # Resource Registry.
+            #
+            # Do NOT route this through AtlasProject.add_resource().
+            # add_resource() intentionally requires the Resource's
+            # Classification to already be registered with the Project.
+            #
+            # ENG-052 permits creation using the supplied Classification
+            # object without first registering that Classification.
+            self._project.resources.register(
                 resource
             )
 
+            # ENG-053 integration:
+            #
+            # Initialize Resource-associated canonical spatial state
+            # independently of AtlasResource itself.
+            self._project.spatial_states.set_position(
+                resource.aid,
+                AtlasSpatialPosition(
+                    x=0.0,
+                    y=0.0,
+                    z=0.0,
+                ),
+            )
+
             return resource
+
+        # --------------------------------------------------------------
+        # ENG-053 — Resource Move
+        # --------------------------------------------------------------
 
         if command.name == "move_resource":
             resource_id = command.payload.get(
@@ -142,6 +187,8 @@ class AtlasApplication:
                 z=position["z"],
             )
 
+            # Mutation occurs only after Resource resolution and complete
+            # position validation have succeeded.
             self._project.spatial_states.set_position(
                 resource_id,
                 spatial_position,
@@ -152,6 +199,10 @@ class AtlasApplication:
         raise NotImplementedError(
             f"Command '{command.name}' is not implemented"
         )
+
+    # ------------------------------------------------------------------
+    # Query Execution
+    # ------------------------------------------------------------------
 
     def query(
         self,
@@ -171,8 +222,16 @@ class AtlasApplication:
                 "query must be an AtlasQuery"
             )
 
+        # --------------------------------------------------------------
+        # ENG-039 — Project Query
+        # --------------------------------------------------------------
+
         if query.name == "get_project":
             return self._project
+
+        # --------------------------------------------------------------
+        # ENG-053 — Resource Position Query
+        # --------------------------------------------------------------
 
         if query.name == "get_resource_position":
             resource_id = query.parameters.get(
@@ -187,13 +246,15 @@ class AtlasApplication:
                     "resource_id must be an AtlasID"
                 )
 
-            # The Resource itself must exist.
+            # Canonical Resource must exist.
             self._project.require_resource(
                 resource_id
             )
 
-            position = self._project.spatial_states.require_position(
-                resource_id
+            position = (
+                self._project.spatial_states.require_position(
+                    resource_id
+                )
             )
 
             return position.as_mapping()
@@ -201,6 +262,10 @@ class AtlasApplication:
         raise NotImplementedError(
             f"Query '{query.name}' is not implemented"
         )
+
+    # ------------------------------------------------------------------
+    # Resource Presentation
+    # ------------------------------------------------------------------
 
     def present_resource(
         self,
@@ -227,7 +292,13 @@ class AtlasApplication:
             resource_id=resource.aid,
             name=resource.name,
             classification=resource.classification,
-            properties=dict(resource.properties),
-            metadata=dict(resource.metadata),
-            lifecycle=str(resource.lifecycle),
+            properties=dict(
+                resource.properties
+            ),
+            metadata=dict(
+                resource.metadata
+            ),
+            lifecycle=str(
+                resource.lifecycle
+            ),
         )

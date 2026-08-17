@@ -84,7 +84,7 @@ __all__ = [
     "AtlasCommand",
     "AtlasQuery",
 
-    # Resource operations
+    # Resource editing
     "AtlasBasicEditing",
 
     # Selection / UI state

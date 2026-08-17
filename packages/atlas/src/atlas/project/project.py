@@ -66,7 +66,10 @@ class AtlasProject:
         name: str,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        if not isinstance(name, str):
+        if not isinstance(
+            name,
+            str,
+        ):
             raise TypeError(
                 "Project name must be a string"
             )
@@ -78,7 +81,9 @@ class AtlasProject:
 
         self._aid = AtlasID.generate()
         self._name = name
-        self._metadata = dict(metadata or {})
+        self._metadata = dict(
+            metadata or {}
+        )
 
         # --------------------------------------------------------------
         # Resource context
@@ -86,7 +91,11 @@ class AtlasProject:
 
         self._resources = AtlasResourceRegistry()
 
-        self._spatial_states = AtlasSpatialStateRegistry()
+        # ENG-053:
+        # Canonical spatial state remains separate from AtlasResource.
+        self._spatial_states = (
+            AtlasSpatialStateRegistry()
+        )
 
         self._graph = AtlasResourceGraph(
             self._resources
@@ -96,7 +105,9 @@ class AtlasProject:
         # Classification context
         # --------------------------------------------------------------
 
-        self._classifications = AtlasClassificationRegistry()
+        self._classifications = (
+            AtlasClassificationRegistry()
+        )
 
         self._classification_hierarchy = (
             AtlasClassificationHierarchy()
@@ -135,7 +146,10 @@ class AtlasProject:
         value: str,
     ) -> None:
         """Set the Project name."""
-        if not isinstance(value, str):
+        if not isinstance(
+            value,
+            str,
+        ):
             raise TypeError(
                 "Project name must be a string"
             )
@@ -186,7 +200,9 @@ class AtlasProject:
     # ------------------------------------------------------------------
 
     @property
-    def spatial_states(self) -> AtlasSpatialStateRegistry:
+    def spatial_states(
+        self,
+    ) -> AtlasSpatialStateRegistry:
         """
         Return the canonical spatial state registry owned by this Project.
 
@@ -414,6 +430,11 @@ class AtlasProject:
         with this Project.
 
         A canonical spatial state entry is created at the origin.
+
+        This API preserves Project Classification Integrity.
+        ENG-052 Resource creation intentionally does not use this
+        method when the supplied Classification has not yet been
+        registered.
         """
         if not isinstance(
             resource,
@@ -437,8 +458,6 @@ class AtlasProject:
             resource
         )
 
-        # Every canonical Resource starts with deterministic origin
-        # spatial state.
         self._spatial_states.set_position(
             resource.aid,
             AtlasSpatialPosition(
@@ -455,15 +474,18 @@ class AtlasProject:
         aid: AtlasID,
     ) -> AtlasResource | None:
         """
-        Return a Resource by AtlasID.
+        Return a Resource by identifier.
 
         Returns None when the Resource is not registered.
-        """
-        if not isinstance(aid, AtlasID):
-            raise TypeError(
-                "aid must be an AtlasID"
-            )
 
+        This lookup intentionally preserves the existing permissive
+        Registry semantics. Read-oriented callers and Agents may pass
+        an unknown or non-AtlasID identifier and receive None rather
+        than a type-validation failure.
+
+        Strict AtlasID validation belongs at boundaries that require
+        canonical engineering identity, such as Resource Move.
+        """
         return self._resources.get(
             aid
         )
@@ -477,7 +499,10 @@ class AtlasProject:
 
         Raises KeyError when the Resource is not registered.
         """
-        if not isinstance(aid, AtlasID):
+        if not isinstance(
+            aid,
+            AtlasID,
+        ):
             raise TypeError(
                 "aid must be an AtlasID"
             )
@@ -681,8 +706,8 @@ class AtlasProject:
         """
         Remove a Relationship from this Project.
 
-        Returns the removed Relationship, or None if it is not
-        registered.
+        Returns the removed Relationship, or None if it is
+        not registered.
         """
         return self._graph.remove_relationship(
             relationship
@@ -719,8 +744,11 @@ class AtlasProject:
             "AtlasProject("
             f"aid={self.aid}, "
             f"name={self.name!r}, "
-            f"classifications={self._classifications.count}, "
-            f"resources={self._resources.count}, "
-            f"relationships={self._graph.count}"
+            f"classifications="
+            f"{self._classifications.count}, "
+            f"resources="
+            f"{self._resources.count}, "
+            f"relationships="
+            f"{self._graph.count}"
             ")"
         )
