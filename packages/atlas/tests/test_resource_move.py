@@ -41,12 +41,28 @@ def create_resource() -> AtlasResource:
     )
 
 
-def create_project_with_resource() -> tuple[AtlasProject, AtlasResource]:
+def create_project_with_resource() -> tuple[
+    AtlasProject,
+    AtlasResource,
+]:
     project = AtlasProject(
         name="ENG-053 Move Test Project",
     )
 
-    resource = create_resource()
+    classification = AtlasClassification(
+        id="wall",
+        name="Wall",
+    )
+
+    # AtlasProject requires the Resource's Classification
+    # to be registered before the Resource itself is added.
+    project.add_classification(classification)
+
+    resource = AtlasResource(
+        classification=classification,
+        name="North Wall",
+    )
+
     project.add_resource(resource)
 
     return project, resource
@@ -58,8 +74,8 @@ def create_move_command(
     """
     Build the ENG-053 command using only the semantics currently frozen.
 
-    The concrete Move payload is intentionally not defined here yet because
-    ENG-053 has not frozen the representation of canonical spatial state.
+    The concrete Move payload is intentionally not defined here because
+    ENG-053 has not yet frozen the representation of canonical spatial state.
     """
     return AtlasCommand(
         name="move_resource",
@@ -84,7 +100,9 @@ class TestResourceMoveCommand:
         assert command.name == "move_resource"
         assert command.payload["resource_id"] == resource.aid
 
-    def test_move_command_requires_canonical_resource_identity(self) -> None:
+    def test_move_command_requires_canonical_resource_identity(
+        self,
+    ) -> None:
         project, resource = create_project_with_resource()
 
         command = create_move_command(resource.aid)
@@ -159,7 +177,6 @@ class TestResourceMoveIdentity:
         command = create_move_command(original_id)
 
         # RED:
-        # The actual move implementation does not yet exist.
         application.execute(command)
 
         moved_resource = project.require_resource(original_id)
@@ -360,12 +377,9 @@ class TestResourceMoveSceneIsolation:
 
     def test_move_does_not_mutate_scene_node_state(self) -> None:
         """
-        This test intentionally documents an architectural invariant.
-
         ENG-053 must not silently delegate Resource Move to ENG-051
         SceneNode transformation.
         """
-        # No Scene is constructed deliberately.
         project, resource = create_project_with_resource()
         application = AtlasApplication(project)
 
