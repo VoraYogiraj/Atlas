@@ -7,9 +7,11 @@ Provides the project-level container that owns:
     - Resource relationships
     - Classifications
     - Classification hierarchy
+    - Canonical Resource spatial state
 
 A Project defines the boundary within which Resources,
-Classifications, and Relationships are considered valid.
+Classifications, Relationships, and canonical Resource spatial
+state are considered valid.
 
 Specifications:
     ENG-001 — Project
@@ -19,6 +21,7 @@ Specifications:
     ENG-018 — Classification Registry
     ENG-019 — Project Classification Integrity
     ENG-022 — Project Relationship Queries
+    ENG-053 — Atlas Resource Move
 """
 
 from __future__ import annotations
@@ -30,6 +33,10 @@ from atlas.classification.hierarchy import AtlasClassificationHierarchy
 from atlas.classification.registry import AtlasClassificationRegistry
 from atlas.core.aid import AtlasID
 from atlas.core.resource import AtlasResource
+from atlas.core.spatial import (
+    AtlasSpatialPosition,
+    AtlasSpatialStateRegistry,
+)
 from atlas.graph.graph import AtlasResourceGraph
 from atlas.relationships.relationship import AtlasRelationship
 from atlas.resource_registry import AtlasResourceRegistry
@@ -40,7 +47,8 @@ class AtlasProject:
     Project-level Atlas context.
 
     A Project owns its Resource Registry, Resource Graph,
-    Classification Registry, and Classification Hierarchy.
+    Classification Registry, Classification Hierarchy,
+    and canonical spatial state registry.
 
     Resources and Classifications are project-scoped. A Resource
     cannot be added to a Project unless its Classification is also
@@ -48,6 +56,9 @@ class AtlasProject:
 
     Relationships are managed by the Project's Resource Graph and
     therefore both endpoint Resources must belong to the Project.
+
+    Canonical spatial state is stored separately from AtlasResource
+    and is keyed by the Resource's immutable AtlasID.
     """
 
     def __init__(
@@ -75,6 +86,8 @@ class AtlasProject:
 
         self._resources = AtlasResourceRegistry()
 
+        self._spatial_states = AtlasSpatialStateRegistry()
+
         self._graph = AtlasResourceGraph(
             self._resources
         )
@@ -83,9 +96,7 @@ class AtlasProject:
         # Classification context
         # --------------------------------------------------------------
 
-        self._classifications = (
-            AtlasClassificationRegistry()
-        )
+        self._classifications = AtlasClassificationRegistry()
 
         self._classification_hierarchy = (
             AtlasClassificationHierarchy()
@@ -171,6 +182,20 @@ class AtlasProject:
         return self._resources
 
     # ------------------------------------------------------------------
+    # Spatial State Registry
+    # ------------------------------------------------------------------
+
+    @property
+    def spatial_states(self) -> AtlasSpatialStateRegistry:
+        """
+        Return the canonical spatial state registry owned by this Project.
+
+        Spatial state is keyed by AtlasID and is intentionally separate
+        from AtlasResource.
+        """
+        return self._spatial_states
+
+    # ------------------------------------------------------------------
     # Resource Graph
     # ------------------------------------------------------------------
 
@@ -247,6 +272,14 @@ class AtlasProject:
         AtlasClassification
             The registered Classification.
         """
+        if not isinstance(
+            classification,
+            AtlasClassification,
+        ):
+            raise TypeError(
+                "classification must be an AtlasClassification"
+            )
+
         classification_id = classification.id
 
         if self._classifications.contains(
@@ -380,11 +413,16 @@ class AtlasProject:
         The Resource's Classification must already be registered
         with this Project.
 
-        Returns
-        -------
-        AtlasResource
-            The same Resource instance that was registered.
+        A canonical spatial state entry is created at the origin.
         """
+        if not isinstance(
+            resource,
+            AtlasResource,
+        ):
+            raise TypeError(
+                "resource must be an AtlasResource"
+            )
+
         classification_id = resource.classification.id
 
         if not self._classifications.contains(
@@ -399,6 +437,17 @@ class AtlasProject:
             resource
         )
 
+        # Every canonical Resource starts with deterministic origin
+        # spatial state.
+        self._spatial_states.set_position(
+            resource.aid,
+            AtlasSpatialPosition(
+                x=0.0,
+                y=0.0,
+                z=0.0,
+            ),
+        )
+
         return resource
 
     def get_resource(
@@ -410,6 +459,11 @@ class AtlasProject:
 
         Returns None when the Resource is not registered.
         """
+        if not isinstance(aid, AtlasID):
+            raise TypeError(
+                "aid must be an AtlasID"
+            )
+
         return self._resources.get(
             aid
         )
@@ -423,6 +477,11 @@ class AtlasProject:
 
         Raises KeyError when the Resource is not registered.
         """
+        if not isinstance(aid, AtlasID):
+            raise TypeError(
+                "aid must be an AtlasID"
+            )
+
         return self._resources.require(
             aid
         )
@@ -437,11 +496,22 @@ class AtlasProject:
         Any Relationships involving the Resource are removed from
         the Project Graph first.
 
+        Canonical spatial state associated with the Resource is also
+        removed.
+
         Returns
         -------
         AtlasResource | None
             The removed Resource, or None if it is not registered.
         """
+        if not isinstance(
+            resource,
+            AtlasResource,
+        ):
+            raise TypeError(
+                "resource must be an AtlasResource"
+            )
+
         registered = self._resources.get(
             resource.aid
         )
@@ -458,9 +528,16 @@ class AtlasProject:
                 relationship
             )
 
-        return self._resources.unregister(
+        removed = self._resources.unregister(
             registered.aid
         )
+
+        if removed is not None:
+            self._spatial_states.remove(
+                registered.aid
+            )
+
+        return removed
 
     # ------------------------------------------------------------------
     # Resource Classification Queries
@@ -515,6 +592,14 @@ class AtlasProject:
         AtlasRelationship
             The same Relationship instance that was registered.
         """
+        if not isinstance(
+            relationship,
+            AtlasRelationship,
+        ):
+            raise TypeError(
+                "relationship must be an AtlasRelationship"
+            )
+
         self._graph.add_relationship(
             relationship
         )
@@ -580,11 +665,6 @@ class AtlasProject:
         Return all Relationships of a specific type.
 
         Registration order is preserved.
-
-        Raises
-        ------
-        ValueError
-            If relationship_type is empty or whitespace.
         """
         return self._graph.for_relationship_type(
             relationship_type

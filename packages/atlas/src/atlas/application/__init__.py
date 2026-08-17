@@ -13,10 +13,11 @@ ENG-048 — Atlas Navigation
 ENG-049 — Atlas Selection
 ENG-050 — Atlas Gizmo
 ENG-051 — Atlas Basic Editing
+ENG-052 — Atlas Resource Create
+ENG-053 — Atlas Resource Move
 """
 
 from atlas.application.application import AtlasApplication
-from atlas.application.basic_editing import AtlasBasicEditing
 from atlas.application.camera import AtlasCamera
 from atlas.application.commands import AtlasCommand
 from atlas.application.dashboard import (
@@ -46,7 +47,10 @@ from atlas.application.panel import AtlasPanel
 from atlas.application.panel_registry import AtlasPanelRegistry
 from atlas.application.presentation import AtlasResourcePresentation
 from atlas.application.queries import AtlasQuery
-from atlas.application.scene import AtlasScene, AtlasSceneNode
+from atlas.application.scene import (
+    AtlasScene,
+    AtlasSceneNode,
+)
 from atlas.application.selection import (
     AtlasResourceSelection,
     AtlasSelectionState,
@@ -81,7 +85,6 @@ __all__ = [
     "AtlasCamera",
     "AtlasNavigation",
     "AtlasGizmo",
-    "AtlasBasicEditing",
     "AtlasDashboard",
     "AtlasDashboardPresentation",
     "AtlasDashboardSelectionTarget",
