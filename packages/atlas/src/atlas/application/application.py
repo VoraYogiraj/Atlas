@@ -5,6 +5,7 @@ ENG-039 — Atlas UI Architecture
 ENG-052 — Atlas Resource Create
 ENG-053 — Atlas Resource Move
 ENG-054 — Atlas Resource Rotate
+ENG-055 — Atlas Resource Scale
 
 Thin application boundary between UI interactions and the canonical
 Atlas domain model.
@@ -21,6 +22,7 @@ from atlas.core.aid import AtlasID
 from atlas.core.spatial import (
     AtlasSpatialPosition,
     AtlasSpatialRotation,
+    AtlasSpatialScale,
 )
 from atlas.project.project import AtlasProject
 
@@ -141,6 +143,18 @@ class AtlasApplication:
                 ),
             )
 
+            # ENG-055 spatial initialization.
+            #
+            # Scale is dimensionless and neutral at Resource creation.
+            self._project.spatial_states.set_scale(
+                resource.aid,
+                AtlasSpatialScale(
+                    x=1.0,
+                    y=1.0,
+                    z=1.0,
+                ),
+            )
+
             return resource
 
         # --------------------------------------------------------------
@@ -255,6 +269,62 @@ class AtlasApplication:
 
             return spatial_rotation.as_mapping()
 
+        # --------------------------------------------------------------
+        # ENG-055 — Resource Scale
+        # --------------------------------------------------------------
+
+        if command.name == "scale_resource":
+            resource_id = command.payload.get(
+                "resource_id"
+            )
+
+            if not isinstance(
+                resource_id,
+                AtlasID,
+            ):
+                raise TypeError(
+                    "resource_id must be an AtlasID"
+                )
+
+            self._project.require_resource(
+                resource_id
+            )
+
+            scale = command.payload.get(
+                "scale"
+            )
+
+            if not isinstance(
+                scale,
+                dict,
+            ):
+                raise TypeError(
+                    "scale must be a dictionary"
+                )
+
+            if set(scale.keys()) != {
+                "x",
+                "y",
+                "z",
+            }:
+                raise ValueError(
+                    "scale must contain exactly x, y, and z"
+                )
+
+            spatial_scale = AtlasSpatialScale(
+                x=scale["x"],
+                y=scale["y"],
+                z=scale["z"],
+            )
+
+            # Validation is complete before mutation.
+            self._project.spatial_states.set_scale(
+                resource_id,
+                spatial_scale,
+            )
+
+            return spatial_scale.as_mapping()
+
         raise NotImplementedError(
             f"Command '{command.name}' is not implemented"
         )
@@ -344,6 +414,35 @@ class AtlasApplication:
             )
 
             return rotation.as_mapping()
+
+        # --------------------------------------------------------------
+        # ENG-055 — Resource Scale
+        # --------------------------------------------------------------
+
+        if query.name == "get_resource_scale":
+            resource_id = query.parameters.get(
+                "resource_id"
+            )
+
+            if not isinstance(
+                resource_id,
+                AtlasID,
+            ):
+                raise TypeError(
+                    "resource_id must be an AtlasID"
+                )
+
+            self._project.require_resource(
+                resource_id
+            )
+
+            scale = (
+                self._project.spatial_states.require_scale(
+                    resource_id
+                )
+            )
+
+            return scale.as_mapping()
 
         raise NotImplementedError(
             f"Query '{query.name}' is not implemented"

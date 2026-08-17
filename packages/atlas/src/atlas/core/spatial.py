@@ -3,6 +3,7 @@ Atlas Spatial State
 
 ENG-053 — Atlas Resource Move
 ENG-054 — Atlas Resource Rotate
+ENG-055 — Atlas Resource Scale
 
 Canonical spatial state associated with Atlas Resources.
 
@@ -107,6 +108,59 @@ class AtlasSpatialRotation:
 
 
 # ---------------------------------------------------------------------------
+# Scale
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class AtlasSpatialScale:
+    """
+    Absolute positive 3-component scale associated with an Atlas Resource.
+
+    ENG-055 represents scale as three independent positive finite
+    numeric components.
+
+    Scale is absolute, not multiplicative and not additive.
+    Zero and negative values are invalid.
+    """
+
+    x: float
+    y: float
+    z: float
+
+    def __post_init__(self) -> None:
+        for axis, value in (
+            ("x", self.x),
+            ("y", self.y),
+            ("z", self.z),
+        ):
+            if isinstance(value, bool) or not isinstance(
+                value,
+                (int, float),
+            ):
+                raise TypeError(
+                    f"{axis} must be a numeric value"
+                )
+
+            if not math.isfinite(float(value)):
+                raise ValueError(
+                    f"{axis} must be finite"
+                )
+
+            if float(value) <= 0.0:
+                raise ValueError(
+                    f"{axis} must be greater than zero"
+                )
+
+    def as_mapping(self) -> dict[str, float]:
+        return {
+            "x": float(self.x),
+            "y": float(self.y),
+            "z": float(self.z),
+        }
+
+
+# ---------------------------------------------------------------------------
 # Spatial State Registry
 # ---------------------------------------------------------------------------
 
@@ -117,6 +171,10 @@ class AtlasSpatialStateRegistry:
 
     The registry stores only spatial state and never owns AtlasResource
     objects. AtlasID remains the canonical engineering identity.
+
+    ENG-053 owns position.
+    ENG-054 owns rotation.
+    ENG-055 owns scale.
     """
 
     def __init__(self) -> None:
@@ -128,6 +186,11 @@ class AtlasSpatialStateRegistry:
         self._rotations: dict[
             AtlasID,
             AtlasSpatialRotation,
+        ] = {}
+
+        self._scales: dict[
+            AtlasID,
+            AtlasSpatialScale,
         ] = {}
 
     # ------------------------------------------------------------------
@@ -249,6 +312,65 @@ class AtlasSpatialStateRegistry:
         return rotation
 
     # ------------------------------------------------------------------
+    # Scale
+    # ------------------------------------------------------------------
+
+    def set_scale(
+        self,
+        resource_id: AtlasID,
+        scale: AtlasSpatialScale,
+    ) -> None:
+        if not isinstance(
+            resource_id,
+            AtlasID,
+        ):
+            raise TypeError(
+                "resource_id must be an AtlasID"
+            )
+
+        if not isinstance(
+            scale,
+            AtlasSpatialScale,
+        ):
+            raise TypeError(
+                "scale must be an AtlasSpatialScale"
+            )
+
+        self._scales[resource_id] = scale
+
+    def get_scale(
+        self,
+        resource_id: AtlasID,
+    ) -> AtlasSpatialScale | None:
+        if not isinstance(
+            resource_id,
+            AtlasID,
+        ):
+            raise TypeError(
+                "resource_id must be an AtlasID"
+            )
+
+        return self._scales.get(
+            resource_id
+        )
+
+    def require_scale(
+        self,
+        resource_id: AtlasID,
+    ) -> AtlasSpatialScale:
+        scale = self.get_scale(
+            resource_id
+        )
+
+        if scale is None:
+            raise KeyError(
+                "No spatial scale registered for Resource: "
+                f"{resource_id}"
+            )
+
+        return scale
+
+    # ------------------------------------------------------------------
     # Lifecycle
     # ------------------------------------------------------------------
 
@@ -274,6 +396,11 @@ class AtlasSpatialStateRegistry:
             None,
         )
 
+        self._scales.pop(
+            resource_id,
+            None,
+        )
+
     def contains(
         self,
         resource_id: AtlasID,
@@ -289,6 +416,7 @@ class AtlasSpatialStateRegistry:
         return (
             resource_id in self._positions
             or resource_id in self._rotations
+            or resource_id in self._scales
         )
 
     @property
@@ -299,11 +427,13 @@ class AtlasSpatialStateRegistry:
         return len(
             set(self._positions)
             | set(self._rotations)
+            | set(self._scales)
         )
 
 
 __all__ = [
     "AtlasSpatialPosition",
     "AtlasSpatialRotation",
+    "AtlasSpatialScale",
     "AtlasSpatialStateRegistry",
 ]
