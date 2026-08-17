@@ -20,11 +20,6 @@ from atlas.project.project import AtlasProject
 from atlas.relationships.relationship import AtlasRelationship
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def make_project() -> tuple[AtlasProject, AtlasClassification]:
     project = AtlasProject("Delete Test Project")
 
@@ -53,15 +48,8 @@ def make_resource(
     return resource
 
 
-def make_application(
-    project: AtlasProject,
-) -> AtlasApplication:
+def make_application(project: AtlasProject) -> AtlasApplication:
     return AtlasApplication(project)
-
-
-# ---------------------------------------------------------------------------
-# Command
-# ---------------------------------------------------------------------------
 
 
 class TestResourceDeleteCommand:
@@ -88,11 +76,6 @@ class TestResourceDeleteCommand:
         )
 
         assert command.payload["resource_id"] == resource_id
-
-
-# ---------------------------------------------------------------------------
-# Resource deletion
-# ---------------------------------------------------------------------------
 
 
 class TestResourceDeleteApplication:
@@ -143,11 +126,6 @@ class TestResourceDeleteApplication:
         assert project.resource_count == count_before - 1
 
 
-# ---------------------------------------------------------------------------
-# Relationship cleanup
-# ---------------------------------------------------------------------------
-
-
 class TestResourceDeleteRelationshipCleanup:
     def test_delete_removes_outgoing_relationships(self) -> None:
         project, classification = make_project()
@@ -166,9 +144,10 @@ class TestResourceDeleteRelationshipCleanup:
         )
 
         relationship = AtlasRelationship(
+            id=str(AtlasID.generate()),
+            relationship_type="supports",
             source=resource_a,
             target=resource_b,
-            relationship_type="supports",
         )
 
         project.add_relationship(relationship)
@@ -203,12 +182,15 @@ class TestResourceDeleteRelationshipCleanup:
         )
 
         relationship = AtlasRelationship(
+            id=str(AtlasID.generate()),
+            relationship_type="supports",
             source=resource_a,
             target=resource_b,
-            relationship_type="supports",
         )
 
         project.add_relationship(relationship)
+
+        assert project.relationship_count == 1
 
         application.execute(
             AtlasCommand(
@@ -244,15 +226,17 @@ class TestResourceDeleteRelationshipCleanup:
         )
 
         relationship_ab = AtlasRelationship(
+            id=str(AtlasID.generate()),
+            relationship_type="supports",
             source=resource_a,
             target=resource_b,
-            relationship_type="supports",
         )
 
         relationship_bc = AtlasRelationship(
+            id=str(AtlasID.generate()),
+            relationship_type="adjacent",
             source=resource_b,
             target=resource_c,
-            relationship_type="adjacent",
         )
 
         project.add_relationship(relationship_ab)
@@ -271,16 +255,9 @@ class TestResourceDeleteRelationshipCleanup:
 
         assert project.relationship_count == 1
 
-        remaining = project.relationships_by_type(
-            "adjacent"
-        )
+        remaining = project.relationships_by_type("adjacent")
 
         assert relationship_bc in remaining
-
-
-# ---------------------------------------------------------------------------
-# Spatial cleanup
-# ---------------------------------------------------------------------------
 
 
 class TestResourceDeleteSpatialCleanup:
@@ -414,11 +391,6 @@ class TestResourceDeleteSpatialCleanup:
             )
 
 
-# ---------------------------------------------------------------------------
-# Resource isolation
-# ---------------------------------------------------------------------------
-
-
 class TestResourceDeleteIsolation:
     def test_delete_one_resource_does_not_delete_another(self) -> None:
         project, classification = make_project()
@@ -448,9 +420,7 @@ class TestResourceDeleteIsolation:
         assert project.get_resource(resource_a.aid) is None
         assert project.get_resource(resource_b.aid) is resource_b
 
-    def test_delete_one_resource_does_not_change_another_position(
-        self,
-    ) -> None:
+    def test_delete_one_resource_does_not_change_another_position(self) -> None:
         project, classification = make_project()
         application = make_application(project)
 
@@ -504,9 +474,7 @@ class TestResourceDeleteIsolation:
             "z": 33.0,
         }
 
-    def test_delete_one_resource_does_not_change_another_rotation(
-        self,
-    ) -> None:
+    def test_delete_one_resource_does_not_change_another_rotation(self) -> None:
         project, classification = make_project()
         application = make_application(project)
 
@@ -560,9 +528,7 @@ class TestResourceDeleteIsolation:
             "z": 33.0,
         }
 
-    def test_delete_one_resource_does_not_change_another_scale(
-        self,
-    ) -> None:
+    def test_delete_one_resource_does_not_change_another_scale(self) -> None:
         project, classification = make_project()
         application = make_application(project)
 
@@ -617,11 +583,6 @@ class TestResourceDeleteIsolation:
         }
 
 
-# ---------------------------------------------------------------------------
-# Unknown Resource
-# ---------------------------------------------------------------------------
-
-
 class TestResourceDeleteUnknownResource:
     def test_delete_unknown_resource_fails(self) -> None:
         project, _classification = make_project()
@@ -639,9 +600,7 @@ class TestResourceDeleteUnknownResource:
                 )
             )
 
-    def test_delete_unknown_resource_does_not_mutate_project(
-        self,
-    ) -> None:
+    def test_delete_unknown_resource_does_not_mutate_project(self) -> None:
         project, classification = make_project()
         application = make_application(project)
 
@@ -671,11 +630,6 @@ class TestResourceDeleteUnknownResource:
         assert project.get_resource(resource.aid) is resource
 
 
-# ---------------------------------------------------------------------------
-# Invalid identity
-# ---------------------------------------------------------------------------
-
-
 class TestResourceDeleteValidation:
     def test_delete_rejects_non_atlas_id(self) -> None:
         project, classification = make_project()
@@ -701,11 +655,6 @@ class TestResourceDeleteValidation:
 
         assert project.resource_count == resource_count_before
         assert project.get_resource(resource.aid) is resource
-
-
-# ---------------------------------------------------------------------------
-# Repeated deletion
-# ---------------------------------------------------------------------------
 
 
 class TestResourceDeleteRepeated:
