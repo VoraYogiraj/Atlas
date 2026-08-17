@@ -14,7 +14,9 @@ from typing import Any
 from atlas.application.commands import AtlasCommand
 from atlas.application.presentation import AtlasResourcePresentation
 from atlas.application.queries import AtlasQuery
+from atlas.classification.classification import AtlasClassification
 from atlas.project.project import AtlasProject
+from atlas.resource.resource import AtlasResource
 
 
 class AtlasApplication:
@@ -40,15 +42,32 @@ class AtlasApplication:
         """
         Execute an application command.
 
-        ENG-039 intentionally starts with a minimal command boundary.
-        Domain-specific command handlers will be introduced by later
-        implementation milestones.
+        ENG-052 introduces canonical Resource creation through the
+        application boundary.
         """
         if not isinstance(command, AtlasCommand):
             raise TypeError("command must be an AtlasCommand")
 
         if command.name == "noop":
             return None
+
+        if command.name == "create_resource":
+            classification = command.payload["classification"]
+            name = command.payload.get("name")
+
+            if not isinstance(classification, AtlasClassification):
+                raise TypeError(
+                    "classification must be an AtlasClassification"
+                )
+
+            resource = AtlasResource(
+                classification=classification,
+                name=name,
+            )
+
+            self._project.resources.register(resource)
+
+            return resource
 
         raise NotImplementedError(
             f"Command '{command.name}' is not implemented"
