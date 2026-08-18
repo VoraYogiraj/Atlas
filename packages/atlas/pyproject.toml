@@ -7,7 +7,11 @@ name = "atlas"
 version = "0.1.0"
 description = "Atlas Engineering Intelligence Platform"
 requires-python = ">=3.13,<3.15"
-dependencies = []
+
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+]
 
 [project.optional-dependencies]
 dev = [
