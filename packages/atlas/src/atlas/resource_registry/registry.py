@@ -51,9 +51,17 @@ class AtlasResourceRegistry:
 
         Raises
         ------
+        TypeError
+            If resource is not an AtlasResource.
+
         ValueError
             If a Resource with the same AtlasID is already registered.
         """
+        if not isinstance(resource, AtlasResource):
+            raise TypeError(
+                "resource must be an AtlasResource"
+            )
+
         if resource.aid in self._resources:
             raise ValueError(
                 f"Resource already registered: {resource.aid}"

@@ -120,8 +120,21 @@ class AtlasValidationEngine:
         """
         Execute all registered validation rules against a Resource.
 
+        Raises
+        ------
+        TypeError
+            If resource is not an AtlasResource.
+
         Results preserve rule execution order.
         """
+        if not isinstance(
+            resource,
+            AtlasResource,
+        ):
+            raise TypeError(
+                "resource must be an AtlasResource"
+            )
+
         results: list[AtlasValidationResult] = []
 
         for rule in self._rules.values():
