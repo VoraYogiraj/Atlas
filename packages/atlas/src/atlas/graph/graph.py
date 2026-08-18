@@ -63,9 +63,17 @@ class AtlasResourceGraph:
 
         Raises
         ------
+        TypeError
+            If resource is not an AtlasResource.
+
         ValueError
             If the Resource does not belong to the associated registry.
         """
+        if not isinstance(resource, AtlasResource):
+            raise TypeError(
+                "resource must be an AtlasResource"
+            )
+
         if not self._resources.contains(resource.aid):
             raise ValueError(
                 f"Resource does not belong to graph registry: "
@@ -78,7 +86,17 @@ class AtlasResourceGraph:
     ) -> None:
         """
         Ensure both endpoints of a Relationship belong to this graph.
+
+        Raises
+        ------
+        TypeError
+            If relationship is not an AtlasRelationship.
         """
+        if not isinstance(relationship, AtlasRelationship):
+            raise TypeError(
+                "relationship must be an AtlasRelationship"
+            )
+
         self._validate_resource(
             relationship.source
         )
@@ -103,6 +121,9 @@ class AtlasResourceGraph:
 
         Raises
         ------
+        TypeError
+            If relationship is not an AtlasRelationship.
+
         ValueError
             If either endpoint is not registered or the relationship
             already exists.
