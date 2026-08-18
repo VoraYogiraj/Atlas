@@ -14,12 +14,14 @@ Atlas domain model.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from typing import Any
 
 from atlas.application.commands import AtlasCommand
 from atlas.application.presentation import AtlasResourcePresentation
 from atlas.application.queries import AtlasQuery
 from atlas.core.aid import AtlasID
+from atlas.core.resource import AtlasResource
 from atlas.core.spatial import (
     AtlasSpatialPosition,
     AtlasSpatialRotation,
@@ -100,8 +102,6 @@ class AtlasApplication:
             from atlas.classification.classification import (
                 AtlasClassification,
             )
-            from atlas.core.resource import AtlasResource
-
             if not isinstance(
                 classification,
                 AtlasClassification,
@@ -157,6 +157,102 @@ class AtlasApplication:
             )
 
             return resource
+
+        # --------------------------------------------------------------
+        # ENG-057 — Resource Duplicate
+        # --------------------------------------------------------------
+
+        if command.name == "duplicate_resource":
+            if set(command.payload) != {"resource_id"}:
+                raise TypeError(
+                    "duplicate_resource accepts exactly resource_id"
+                )
+
+            resource_id = command.payload.get(
+                "resource_id"
+            )
+
+            if not isinstance(
+                resource_id,
+                AtlasID,
+            ):
+                raise TypeError(
+                    "resource_id must be an AtlasID"
+                )
+
+            source = self._project.require_resource(
+                resource_id
+            )
+
+            # Resolve every source-owned state before mutating the
+            # canonical Project. This keeps invalid source/state
+            # resolution atomic.
+            source_properties = deepcopy(
+                source.properties
+            )
+            source_metadata = deepcopy(
+                source.metadata
+            )
+            source_tags = tuple(
+                source.tags
+            )
+            source_categories = tuple(
+                source.categories
+            )
+            source_position = deepcopy(
+                self._project.spatial_states.require_position(
+                    source.aid
+                )
+            )
+            source_rotation = deepcopy(
+                self._project.spatial_states.require_rotation(
+                    source.aid
+                )
+            )
+            source_scale = deepcopy(
+                self._project.spatial_states.require_scale(
+                    source.aid
+                )
+            )
+
+            duplicate = AtlasResource(
+                classification=source.classification,
+                name=source.name,
+            )
+
+            duplicate.properties.update(
+                source_properties
+            )
+            duplicate.metadata.update(
+                source_metadata
+            )
+
+            for tag in source_tags:
+                duplicate.add_tag(tag)
+
+            for category in source_categories:
+                duplicate.add_category(category)
+
+            # The duplicate intentionally starts in its new Resource
+            # creation lifecycle. Relationships are not copied.
+            self._project.add_resource(
+                duplicate
+            )
+
+            self._project.spatial_states.set_position(
+                duplicate.aid,
+                source_position,
+            )
+            self._project.spatial_states.set_rotation(
+                duplicate.aid,
+                source_rotation,
+            )
+            self._project.spatial_states.set_scale(
+                duplicate.aid,
+                source_scale,
+            )
+
+            return duplicate
 
         # --------------------------------------------------------------
         # ENG-053 — Resource Move
